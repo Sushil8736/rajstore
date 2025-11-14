@@ -252,13 +252,6 @@ export function CreateBill({ user }: CreateBillProps) {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label>Select from Stock (Optional)</Label>
-                      <Input
-                        type="text"
-                        placeholder="Search stock..."
-                        value={stockSearch}
-                        onChange={e => setStockSearch(e.target.value)}
-                        className="mb-2"
-                      />
                       <Select
                         value={item.stockId || ''}
                         onValueChange={(value) => updateItem(item.id, 'stockId', value)}
@@ -267,6 +260,18 @@ export function CreateBill({ user }: CreateBillProps) {
                           <SelectValue placeholder="Select stock item" />
                         </SelectTrigger>
                         <SelectContent>
+                          {/* Search input inside dropdown */}
+                          <div className="px-2 py-1 sticky top-0 bg-white z-10">
+                            <Input
+                              type="text"
+                              placeholder="Search stock..."
+                              value={stockSearch}
+                              onChange={e => setStockSearch(e.target.value)}
+                              autoFocus
+                              className="mb-2"
+                            />
+                          </div>
+                          {/* Filtered stock items */}
                           {stockItems.filter(stock => stock.name.toLowerCase().includes(stockSearch.toLowerCase())).map(stock => (
                             <SelectItem key={stock.id} value={stock.id}>
                               {stock.name} (Qty: {stock.quantity})

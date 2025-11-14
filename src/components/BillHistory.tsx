@@ -4,8 +4,9 @@ import type { Bill, BusinessSettings } from '../types';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Input } from './ui/input';
 import { Button } from './ui/button';
-import { Search, Printer, Eye } from 'lucide-react';
+import { Search, Printer, Eye, Trash2 } from 'lucide-react';
 import { BillPreview } from './BillPreview';
+import { toast } from 'sonner';
 
 export function BillHistory() {
   const [bills, setBills] = useState<Bill[]>([]);
@@ -75,6 +76,21 @@ export function BillHistory() {
       hour: '2-digit',
       minute: '2-digit',
     });
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this bill?')) {
+      return;
+    }
+
+    try {
+      await billAPI.deleteBill(id);
+      toast.success('Bill deleted successfully');
+      loadBills();
+    } catch (error) {
+      console.error('Error deleting bill:', error);
+      toast.error('Failed to delete bill');
+    }
   };
 
   if (loading) {
@@ -157,6 +173,14 @@ export function BillHistory() {
                           size="sm"
                         >
                           <Eye className="h-4 w-4" />
+                        </Button>
+
+                        <Button
+                          onClick={() => handleDelete(bill.id)}
+                          variant="outline"
+                          size="sm"
+                        >
+                          <Trash2 className="h-4 w-4 text-red-500" />
                         </Button>
                       </div>
                     </div>

@@ -55,6 +55,12 @@ export const billAPI = {
     });
     return data.report;
   },
+
+  deleteBill: async (id: string): Promise<void> => {
+    await apiCall(`/delete-bill/${id}`, {
+      method: 'DELETE',
+    });
+  },
 };
 
 export const stockAPI = {
