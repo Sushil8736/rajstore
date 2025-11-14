@@ -294,22 +294,21 @@ class BluetoothPrinterService {
 
       // Items header
       commands.push(this.setBold(true));
-      commands.push(this.textToBytes('ITEM            QTY   RATE  TOTAL'));
+      commands.push(this.textToBytes('Item          Qty   Rate  Amount'));
       commands.push(this.lineFeed());
       commands.push(this.separator('-'));
       commands.push(this.setBold(false));
 
       // Print items
       for (const item of billData.items) {
-        // Item name (max 16 chars to fit in 32 char width)
-        const itemName = item.name.substring(0, 16).padEnd(16);
+        // Format: Item (max 12 chars), Qty (3), Rate (7), Amount (8)
+        const name = item.name.length > 12 ? item.name.substring(0, 12) + '…' : item.name.padEnd(12);
         const qty = item.quantity.toString().padStart(3);
-        const rate = item.rate.toFixed(0).padStart(6);
-        const total = item.total.toFixed(0).padStart(6);
-        
-        commands.push(this.textToBytes(itemName));
-        commands.push(this.lineFeed());
-        commands.push(this.textToBytes(`                ${qty} ${rate} ${total}`));
+        const rate = item.rate.toFixed(2).padStart(7);
+        const total = item.total.toFixed(2).padStart(8);
+        // Single line for each item
+        const itemLine = `${name}${qty}${rate}${total}`;
+        commands.push(this.textToBytes(itemLine));
         commands.push(this.lineFeed());
       }
 
@@ -319,10 +318,12 @@ class BluetoothPrinterService {
       // Grand total (bold, larger)
       commands.push(this.setBold(true));
       commands.push(this.setTextSize(2, 2));
-      commands.push(this.textToBytes(this.formatLine('TOTAL:', `Rs.${billData.grandTotal.toFixed(2)}`, 16)));
+      commands.push(this.setAlignment(2)); // Right align
+      commands.push(this.textToBytes(`Grand Total: Rs.${billData.grandTotal.toFixed(2)}`));
       commands.push(this.lineFeed());
       commands.push(this.setTextSize(1, 1));
       commands.push(this.setBold(false));
+      commands.push(this.setAlignment(0)); // Left align
 
       // Notes
       if (billData.notes) {

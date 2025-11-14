@@ -26,6 +26,7 @@ export function CreateBill({ user }: CreateBillProps) {
   const [showPreview, setShowPreview] = useState(false);
   const [createdBill, setCreatedBill] = useState<Bill | null>(null);
   const [loading, setLoading] = useState(false);
+  const [stockSearch, setStockSearch] = useState('');
 
   useEffect(() => {
     initializeBill();
@@ -119,6 +120,20 @@ export function CreateBill({ user }: CreateBillProps) {
 
     setLoading(true);
     try {
+      // Auto-create stock for manual entries
+      for (const item of items) {
+        if (!item.stockId && item.name) {
+          const exists = stockItems.some(stock => stock.name.toLowerCase() === item.name.toLowerCase());
+          if (!exists) {
+            await stockAPI.addStock({
+              name: item.name,
+              quantity: item.quantity,
+              purchaseRate: item.rate,
+            });
+          }
+        }
+      }
+
       const bill: Bill = {
         billNumber,
         date: new Date().toISOString(),
@@ -237,6 +252,13 @@ export function CreateBill({ user }: CreateBillProps) {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label>Select from Stock (Optional)</Label>
+                      <Input
+                        type="text"
+                        placeholder="Search stock..."
+                        value={stockSearch}
+                        onChange={e => setStockSearch(e.target.value)}
+                        className="mb-2"
+                      />
                       <Select
                         value={item.stockId || ''}
                         onValueChange={(value) => updateItem(item.id, 'stockId', value)}
@@ -245,7 +267,7 @@ export function CreateBill({ user }: CreateBillProps) {
                           <SelectValue placeholder="Select stock item" />
                         </SelectTrigger>
                         <SelectContent>
-                          {stockItems.map(stock => (
+                          {stockItems.filter(stock => stock.name.toLowerCase().includes(stockSearch.toLowerCase())).map(stock => (
                             <SelectItem key={stock.id} value={stock.id}>
                               {stock.name} (Qty: {stock.quantity})
                             </SelectItem>
