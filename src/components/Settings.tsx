@@ -8,7 +8,7 @@ import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Save } from 'lucide-react';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
 import { SellerManagement } from './SellerManagement';
 import { BluetoothPrinterManager } from './BluetoothPrinterManager';
 
@@ -34,8 +34,9 @@ export function Settings({ user, accessToken }: SettingsProps) {
   const loadSettings = async () => {
     try {
       const result = await settingsAPI.getSettings();
-      if (result.success && result.settings) {
-        setSettings(result.settings);
+      console.log('Loaded settings:', result);
+      if (result) {
+        setSettings(result);
       }
     } catch (error) {
       console.error('Error loading settings:', error);
@@ -45,12 +46,12 @@ export function Settings({ user, accessToken }: SettingsProps) {
   const handleSave = async () => {
     try {
       setLoading(true);
-      const result = await settingsAPI.updateSettings(settings);
+      const result = await settingsAPI.saveSettings(settings);
       
-      if (result.success) {
+      if (result) {
         toast.success('Settings saved successfully');
       } else {
-        throw new Error(result.error);
+        throw new Error(result);
       }
     } catch (error) {
       console.error('Error saving settings:', error);
