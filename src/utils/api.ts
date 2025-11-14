@@ -56,8 +56,8 @@ export const billAPI = {
     return data.report;
   },
 
-  deleteBill: async (id: string): Promise<void> => {
-    await apiCall(`/delete-bill/${id}`, {
+  deleteBill: async (billNumber: string): Promise<void> => {
+    await apiCall(`/delete-bill/${billNumber}`, {
       method: 'DELETE',
     });
   },

@@ -78,13 +78,13 @@ export function BillHistory() {
     });
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (billNumber: string) => {
     if (!confirm('Are you sure you want to delete this bill?')) {
       return;
     }
 
     try {
-      await billAPI.deleteBill(id);
+      await billAPI.deleteBill(billNumber);
       toast.success('Bill deleted successfully');
       loadBills();
     } catch (error) {
@@ -176,7 +176,7 @@ export function BillHistory() {
                         </Button>
 
                         <Button
-                          onClick={() => handleDelete(bill.id)}
+                          onClick={() => handleDelete(bill.billNumber)}
                           variant="outline"
                           size="sm"
                         >
