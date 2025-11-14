@@ -48,10 +48,10 @@ export const billAPI = {
     return data.bill;
   },
   
-  getReport: async (startDate: string, endDate: string): Promise<SalesReport> => {
+  getReport: async (startDate: string, endDate: string, sellerId?: string): Promise<SalesReport> => {
     const data = await apiCall('/get-report', {
       method: 'POST',
-      body: JSON.stringify({ startDate, endDate }),
+      body: JSON.stringify({ startDate, endDate, sellerId }),
     });
     return data.report;
   },

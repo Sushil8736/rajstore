@@ -16,6 +16,8 @@ export interface Bill {
   paymentMode?: 'Cash' | 'UPI' | 'Card' | '';
   notes?: string;
   businessName?: string;
+  sellerId?: string;
+  sellerName?: string;
 }
 
 export interface StockItem {
@@ -39,4 +41,18 @@ export interface SalesReport {
   totalBills: number;
   paymentModes: Record<string, number>;
   bills: Bill[];
+}
+
+export interface User {
+  id: string;
+  username: string;
+  name: string;
+  role: 'admin' | 'seller';
+  createdAt: string;
+}
+
+export interface AuthState {
+  isAuthenticated: boolean;
+  user: User | null;
+  accessToken: string | null;
 }

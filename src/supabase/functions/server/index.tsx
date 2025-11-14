@@ -1,7 +1,7 @@
 import { Hono } from 'npm:hono';
 import { cors } from 'npm:hono/cors';
 import { logger } from 'npm:hono/logger';
-import { createClient } from 'npm:@supabase/supabase-js@2';
+import { createClient } from 'npm:@supabase/supabase-js';
 import * as kv from './kv_store.tsx';
 
 const app = new Hono();
@@ -13,6 +13,143 @@ const supabase = createClient(
   Deno.env.get('SUPABASE_URL') ?? '',
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 );
+
+// Helper function to verify auth
+async function verifyAuth(request: Request) {
+  const accessToken = request.headers.get('Authorization')?.split(' ')[1];
+  if (!accessToken) {
+    return null;
+  }
+  
+  const { data: { user }, error } = await supabase.auth.getUser(accessToken);
+  if (error || !user) {
+    return null;
+  }
+  
+  return user;
+}
+
+// Signup route
+app.post('/make-server-f305f05f/signup', async (c) => {
+  try {
+    const { username, password, name, role } = await c.req.json();
+    
+    if (!username || !password || !name) {
+      return c.json({ error: 'Missing required fields', success: false }, 400);
+    }
+
+    // Create user with Supabase Auth
+    const { data, error } = await supabase.auth.admin.createUser({
+      email: `${username}@sales-billing.local`,
+      password: password,
+      user_metadata: { name, username, role: role || 'seller' },
+      // Automatically confirm the user's email since an email server hasn't been configured.
+      email_confirm: true
+    });
+
+    if (error) {
+      console.log('Signup error:', error);
+      return c.json({ error: error.message, success: false }, 400);
+    }
+
+    // Store user info in KV
+    const userInfo = {
+      id: data.user.id,
+      username,
+      name,
+      role: role || 'seller',
+      createdAt: new Date().toISOString()
+    };
+
+    await kv.set(`user:${data.user.id}`, userInfo);
+
+    return c.json({ success: true, user: userInfo });
+  } catch (error) {
+    console.log('Error in signup:', error);
+    return c.json({ error: String(error), success: false }, 500);
+  }
+});
+
+// Get current user info
+app.get('/make-server-f305f05f/get-user', async (c) => {
+  try {
+    const user = await verifyAuth(c.req.raw);
+    
+    if (!user) {
+      return c.json({ error: 'Unauthorized', success: false }, 401);
+    }
+
+    const userData = await kv.get(`user:${user.id}`);
+    if (!userData) {
+      return c.json({ error: 'User not found', success: false }, 404);
+    }
+
+    const userInfo = typeof userData === 'string' ? JSON.parse(userData) : userData;
+    return c.json({ success: true, user: userInfo });
+  } catch (error) {
+    console.log('Error getting user:', error);
+    return c.json({ error: String(error), success: false }, 500);
+  }
+});
+
+// Get all sellers (admin only)
+app.get('/make-server-f305f05f/get-sellers', async (c) => {
+  try {
+    const user = await verifyAuth(c.req.raw);
+    
+    if (!user) {
+      return c.json({ error: 'Unauthorized', success: false }, 401);
+    }
+
+    const currentUserData = await kv.get(`user:${user.id}`);
+    const currentUser = typeof currentUserData === 'string' ? JSON.parse(currentUserData) : currentUserData;
+
+    if (currentUser?.role !== 'admin') {
+      return c.json({ error: 'Admin access required', success: false }, 403);
+    }
+
+    const sellers = await kv.getByPrefix('user:');
+    const sellerList = sellers
+      .map(item => typeof item === 'string' ? JSON.parse(item) : item)
+      .sort((a, b) => a.name.localeCompare(b.name));
+
+    return c.json({ success: true, sellers: sellerList });
+  } catch (error) {
+    console.log('Error getting sellers:', error);
+    return c.json({ error: String(error), success: false }, 500);
+  }
+});
+
+// Delete seller (admin only)
+app.delete('/make-server-f305f05f/delete-seller/:userId', async (c) => {
+  try {
+    const user = await verifyAuth(c.req.raw);
+    
+    if (!user) {
+      return c.json({ error: 'Unauthorized', success: false }, 401);
+    }
+
+    const currentUserData = await kv.get(`user:${user.id}`);
+    const currentUser = typeof currentUserData === 'string' ? JSON.parse(currentUserData) : currentUserData;
+
+    if (currentUser?.role !== 'admin') {
+      return c.json({ error: 'Admin access required', success: false }, 403);
+    }
+
+    const userId = c.req.param('userId');
+
+    // Delete from KV store
+    await kv.del(`user:${userId}`);
+
+    // Delete from Supabase Auth
+    await supabase.auth.admin.deleteUser(userId);
+
+    return c.json({ success: true });
+  } catch (error) {
+    console.log('Error deleting seller:', error);
+    return c.json({ error: String(error), success: false }, 500);
+  }
+});
 
 // Get next bill number
 app.post('/make-server-f305f05f/get-next-bill-number', async (c) => {
@@ -98,7 +235,7 @@ app.get('/make-server-f305f05f/get-bill/:billNumber', async (c) => {
 // Get sales report
 app.post('/make-server-f305f05f/get-report', async (c) => {
   try {
-    const { startDate, endDate } = await c.req.json();
+    const { startDate, endDate, sellerId } = await c.req.json();
     
     const bills = await kv.getByPrefix('bill:');
     const billObjects = bills.map(item => typeof item === 'string' ? JSON.parse(item) : item);
@@ -107,10 +244,15 @@ app.post('/make-server-f305f05f/get-report', async (c) => {
     const end = new Date(endDate);
     end.setHours(23, 59, 59, 999);
     
-    const filteredBills = billObjects.filter(bill => {
+    let filteredBills = billObjects.filter(bill => {
       const billDate = new Date(bill.date);
       return billDate >= start && billDate <= end;
     });
+
+    // Filter by seller if specified
+    if (sellerId && sellerId !== 'all') {
+      filteredBills = filteredBills.filter(bill => bill.sellerId === sellerId);
+    }
     
     const totalSales = filteredBills.reduce((sum, bill) => sum + bill.grandTotal, 0);
     const totalBills = filteredBills.length;
@@ -230,6 +372,74 @@ app.get('/make-server-f305f05f/get-settings', async (c) => {
     return c.json({ success: true, settings });
   } catch (error) {
     console.log('Error getting settings:', error);
+    return c.json({ error: String(error), success: false }, 500);
+  }
+});
+
+// Initialize admin user (one-time setup)
+app.post('/make-server-f305f05f/init-admin', async (c) => {
+  try {
+    const { username, password, name } = await c.req.json();
+    
+    if (!username || !password || !name) {
+      return c.json({ error: 'Missing required fields', success: false }, 400);
+    }
+
+    // Check if any admin exists
+    const users = await kv.getByPrefix('user:');
+    const admins = users
+      .map(item => typeof item === 'string' ? JSON.parse(item) : item)
+      .filter(user => user.role === 'admin');
+    
+    if (admins.length > 0) {
+      return c.json({ error: 'Admin user already exists', success: false }, 400);
+    }
+
+    // Create admin user
+    const { data, error } = await supabase.auth.admin.createUser({
+      email: `${username}@sales-billing.local`,
+      password: password,
+      user_metadata: { name, username, role: 'admin' },
+      email_confirm: true
+    });
+
+    if (error) {
+      console.log('Admin creation error:', error);
+      return c.json({ error: error.message, success: false }, 400);
+    }
+
+    const userInfo = {
+      id: data.user.id,
+      username,
+      name,
+      role: 'admin',
+      createdAt: new Date().toISOString()
+    };
+
+    await kv.set(`user:${data.user.id}`, userInfo);
+
+    return c.json({ success: true, user: userInfo });
+  } catch (error) {
+    console.log('Error initializing admin:', error);
+    return c.json({ error: String(error), success: false }, 500);
+  }
+});
+
+// Check if admin exists (public endpoint for initial setup)
+app.get('/make-server-f305f05f/check-admin-exists', async (c) => {
+  try {
+    const users = await kv.getByPrefix('user:');
+    const admins = users
+      .map(item => typeof item === 'string' ? JSON.parse(item) : item)
+      .filter(user => user.role === 'admin');
+    
+    return c.json({ 
+      success: true, 
+      adminExists: admins.length > 0,
+      hasUsers: users.length > 0 
+    });
+  } catch (error) {
+    console.log('Error checking admin exists:', error);
     return c.json({ error: String(error), success: false }, 500);
   }
 });

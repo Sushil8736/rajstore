@@ -1,24 +1,31 @@
 import { useEffect, useState } from 'react';
 import { settingsAPI } from '../utils/api';
-import type { BusinessSettings } from '../types';
+import type { BusinessSettings, User } from '../types';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Save } from 'lucide-react';
 import { toast } from 'sonner@2.0.3';
+import { SellerManagement } from './SellerManagement';
+import { BluetoothPrinterManager } from './BluetoothPrinterManager';
 
-export function Settings() {
+interface SettingsProps {
+  user: User;
+  accessToken: string | null;
+}
+
+export function Settings({ user, accessToken }: SettingsProps) {
   const [settings, setSettings] = useState<BusinessSettings>({
     businessName: '',
     address: '',
     phone: '',
+    gstin: '',
     email: '',
-    gst: '',
   });
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     loadSettings();
@@ -26,138 +33,175 @@ export function Settings() {
 
   const loadSettings = async () => {
     try {
-      const businessSettings = await settingsAPI.getSettings();
-      if (businessSettings) {
-        setSettings(businessSettings);
+      const result = await settingsAPI.getSettings();
+      if (result.success && result.settings) {
+        setSettings(result.settings);
       }
     } catch (error) {
       console.error('Error loading settings:', error);
+    }
+  };
+
+  const handleSave = async () => {
+    try {
+      setLoading(true);
+      const result = await settingsAPI.updateSettings(settings);
+      
+      if (result.success) {
+        toast.success('Settings saved successfully');
+      } else {
+        throw new Error(result.error);
+      }
+    } catch (error) {
+      console.error('Error saving settings:', error);
+      toast.error('Failed to save settings');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSave = async () => {
-    if (!settings.businessName) {
-      toast.error('Business name is required');
-      return;
-    }
-
-    setSaving(true);
-    try {
-      await settingsAPI.saveSettings(settings);
-      toast.success('Settings saved successfully');
-    } catch (error) {
-      console.error('Error saving settings:', error);
-      toast.error('Failed to save settings');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto"></div>
-          <p className="mt-4">Loading settings...</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6">
       <div>
-        <h1>Business Settings</h1>
-        <p className="text-muted-foreground">Configure your business information for bills</p>
+        <h1 className="text-3xl">Settings</h1>
+        <p className="text-muted-foreground">Manage your business settings and preferences</p>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Business Information</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="businessName">Business Name *</Label>
-            <Input
-              id="businessName"
-              value={settings.businessName}
-              onChange={(e) => setSettings({ ...settings, businessName: e.target.value })}
-              placeholder="Enter your business name"
-            />
-          </div>
+      <Tabs defaultValue="business" className="w-full">
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="business">Business</TabsTrigger>
+          <TabsTrigger value="sellers">Sellers</TabsTrigger>
+          <TabsTrigger value="printer">Printer</TabsTrigger>
+          <TabsTrigger value="about">About</TabsTrigger>
+        </TabsList>
 
-          <div className="space-y-2">
-            <Label htmlFor="address">Address (Optional)</Label>
-            <Textarea
-              id="address"
-              value={settings.address}
-              onChange={(e) => setSettings({ ...settings, address: e.target.value })}
-              placeholder="Enter your business address"
-              rows={3}
-            />
-          </div>
+        <TabsContent value="business" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Business Information</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="businessName">Business Name</Label>
+                <Input
+                  id="businessName"
+                  value={settings.businessName}
+                  onChange={(e) => setSettings({ ...settings, businessName: e.target.value })}
+                  placeholder="Enter business name"
+                />
+              </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="phone">Phone Number (Optional)</Label>
-              <Input
-                id="phone"
-                value={settings.phone}
-                onChange={(e) => setSettings({ ...settings, phone: e.target.value })}
-                placeholder="Enter phone number"
-              />
-            </div>
+              <div className="space-y-2">
+                <Label htmlFor="address">Address</Label>
+                <Textarea
+                  id="address"
+                  value={settings.address}
+                  onChange={(e) => setSettings({ ...settings, address: e.target.value })}
+                  placeholder="Enter business address"
+                  rows={3}
+                />
+              </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="email">Email (Optional)</Label>
-              <Input
-                id="email"
-                type="email"
-                value={settings.email}
-                onChange={(e) => setSettings({ ...settings, email: e.target.value })}
-                placeholder="Enter email address"
-              />
-            </div>
-          </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="phone">Phone Number</Label>
+                  <Input
+                    id="phone"
+                    value={settings.phone}
+                    onChange={(e) => setSettings({ ...settings, phone: e.target.value })}
+                    placeholder="Enter phone number"
+                  />
+                </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="gst">GST Number (Optional)</Label>
-            <Input
-              id="gst"
-              value={settings.gst}
-              onChange={(e) => setSettings({ ...settings, gst: e.target.value })}
-              placeholder="Enter GST number"
-            />
-          </div>
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={settings.email}
+                    onChange={(e) => setSettings({ ...settings, email: e.target.value })}
+                    placeholder="Enter email address"
+                  />
+                </div>
+              </div>
 
-          <Button onClick={handleSave} disabled={saving} className="w-full">
-            <Save className="mr-2 h-4 w-4" />
-            {saving ? 'Saving...' : 'Save Settings'}
-          </Button>
-        </CardContent>
-      </Card>
+              <div className="space-y-2">
+                <Label htmlFor="gstin">GSTIN (Optional)</Label>
+                <Input
+                  id="gstin"
+                  value={settings.gstin}
+                  onChange={(e) => setSettings({ ...settings, gstin: e.target.value })}
+                  placeholder="Enter GSTIN"
+                />
+              </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>About This System</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2 text-sm text-muted-foreground">
-          <p>This is a simple Sales & Billing System designed for small businesses.</p>
-          <div className="pt-4 space-y-1">
-            <p>Features:</p>
-            <ul className="list-disc list-inside space-y-1 ml-4">
-              <li>Create and manage bills with automatic bill numbering</li>
-              <li>Track sales by day, month, and financial year</li>
-              <li>Manage stock inventory with automatic quantity updates</li>
-              <li>Print-friendly bill format optimized for thermal printers</li>
-              <li>Payment mode tracking (Cash, UPI, Card)</li>
-              <li>Permanent data storage with Supabase</li>
-            </ul>
-          </div>
-        </CardContent>
-      </Card>
+              <Button onClick={handleSave} disabled={loading}>
+                <Save className="mr-2 h-4 w-4" />
+                {loading ? 'Saving...' : 'Save Settings'}
+              </Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="sellers" className="space-y-4">
+          {accessToken && user.role === 'admin' ? (
+            <SellerManagement accessToken={accessToken} currentUser={user} />
+          ) : (
+            <Card>
+              <CardContent className="pt-6">
+                <p className="text-muted-foreground text-center">
+                  Only admin users can manage sellers.
+                </p>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        <TabsContent value="printer" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Bluetooth Thermal Printer</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <BluetoothPrinterManager />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="about" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>About Sales & Billing System</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <h3 className="mb-2">Version</h3>
+                <p className="text-sm text-muted-foreground">1.0.0</p>
+              </div>
+
+              <div className="pt-4 space-y-1">
+                <p>Features:</p>
+                <ul className="list-disc list-inside space-y-1 ml-4 text-sm text-muted-foreground">
+                  <li>User authentication and seller management</li>
+                  <li>Create and manage bills with automatic bill numbering</li>
+                  <li>Track sales by day, month, and financial year</li>
+                  <li>Manage stock inventory with automatic quantity updates</li>
+                  <li>Print-friendly bill format optimized for thermal printers</li>
+                  <li>Bluetooth thermal printer support (58mm/2-inch)</li>
+                  <li>Payment mode tracking (Cash, UPI, Card)</li>
+                  <li>Permanent data storage with Supabase</li>
+                </ul>
+              </div>
+
+              <div className="pt-4">
+                <p className="text-sm text-muted-foreground">
+                  Developed with React, TypeScript, and Supabase
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

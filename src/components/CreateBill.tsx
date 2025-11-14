@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { billAPI, stockAPI, settingsAPI } from '../utils/api';
-import type { Bill, BillItem, StockItem, BusinessSettings } from '../types';
+import type { Bill, BillItem, StockItem, BusinessSettings, User } from '../types';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -11,7 +11,11 @@ import { Plus, Trash2, Save, Printer, X } from 'lucide-react';
 import { toast } from 'sonner@2.0.3';
 import { BillPreview } from './BillPreview';
 
-export function CreateBill() {
+interface CreateBillProps {
+  user: User | null;
+}
+
+export function CreateBill({ user }: CreateBillProps) {
   const [billNumber, setBillNumber] = useState('');
   const [customerName, setCustomerName] = useState('');
   const [paymentMode, setPaymentMode] = useState<'' | 'Cash' | 'UPI' | 'Card'>('');
@@ -124,6 +128,8 @@ export function CreateBill() {
         paymentMode: paymentMode || undefined,
         notes: notes || undefined,
         businessName: settings?.businessName,
+        sellerId: user?.id,
+        sellerName: user?.name,
       };
 
       await billAPI.createBill(bill);

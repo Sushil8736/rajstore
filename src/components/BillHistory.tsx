@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { billAPI } from '../utils/api';
-import type { Bill } from '../types';
+import { billAPI, settingsAPI } from '../utils/api';
+import type { Bill, BusinessSettings } from '../types';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Input } from './ui/input';
 import { Button } from './ui/button';
@@ -12,10 +12,12 @@ export function BillHistory() {
   const [filteredBills, setFilteredBills] = useState<Bill[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedBill, setSelectedBill] = useState<Bill | null>(null);
+  const [settings, setSettings] = useState<BusinessSettings | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     loadBills();
+    loadSettings();
   }, []);
 
   useEffect(() => {
@@ -31,6 +33,15 @@ export function BillHistory() {
       console.error('Error loading bills:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadSettings = async () => {
+    try {
+      const businessSettings = await settingsAPI.getSettings();
+      setSettings(businessSettings);
+    } catch (error) {
+      console.error('Error loading settings:', error);
     }
   };
 
@@ -123,6 +134,11 @@ export function BillHistory() {
                       <p className="text-sm text-muted-foreground mt-1">
                         {bill.customerName || 'Walk-in Customer'}
                       </p>
+                      {bill.sellerName && (
+                        <p className="text-xs text-muted-foreground">
+                          Seller: {bill.sellerName}
+                        </p>
+                      )}
                       <p className="text-xs text-muted-foreground mt-1">
                         {formatDate(bill.date)}
                       </p>
@@ -162,7 +178,7 @@ export function BillHistory() {
               </Button>
             </div>
             <div className="p-4">
-              <BillPreview bill={selectedBill} settings={null} />
+              <BillPreview bill={selectedBill} settings={settings} />
               <div className="mt-4 flex gap-2">
                 <Button onClick={() => window.print()} className="flex-1">
                   <Printer className="mr-2 h-4 w-4" />

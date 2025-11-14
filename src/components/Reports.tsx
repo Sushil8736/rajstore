@@ -14,11 +14,12 @@ export function Reports() {
   const [loading, setLoading] = useState(false);
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
+  const [selectedSeller, setSelectedSeller] = useState<string>('all');
 
   const generateReport = async (startDate: string, endDate: string) => {
     setLoading(true);
     try {
-      const reportData = await billAPI.getReport(startDate, endDate);
+      const reportData = await billAPI.getReport(startDate, endDate, selectedSeller);
       setReport(reportData);
     } catch (error) {
       console.error('Error generating report:', error);

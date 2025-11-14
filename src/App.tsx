@@ -1,12 +1,16 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Dashboard } from './components/Dashboard';
 import { CreateBill } from './components/CreateBill';
 import { BillHistory } from './components/BillHistory';
 import { Reports } from './components/Reports';
 import { StockManagement } from './components/StockManagement';
 import { Settings } from './components/Settings';
+import { Login } from './components/Login';
 import { Button } from './components/ui/button';
 import { Toaster } from './components/ui/sonner';
+import { User } from './types';
+import { supabase } from './utils/supabase/client';
+import { projectId, publicAnonKey } from './utils/supabase/info';
 import {
   LayoutDashboard,
   FileText,
@@ -16,6 +20,7 @@ import {
   Settings as SettingsIcon,
   Menu,
   X,
+  LogOut,
 } from 'lucide-react';
 
 type Page = 'dashboard' | 'create-bill' | 'history' | 'reports' | 'stock' | 'settings';
@@ -23,6 +28,69 @@ type Page = 'dashboard' | 'create-bill' | 'history' | 'reports' | 'stock' | 'set
 export default function App() {
   const [currentPage, setCurrentPage] = useState<Page>('dashboard');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
+  const [accessToken, setAccessToken] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    checkSession();
+  }, []);
+
+  const checkSession = async () => {
+    try {
+      const { data: { session }, error } = await supabase.auth.getSession();
+      
+      if (session && session.access_token) {
+        // Fetch user details
+        const response = await fetch(
+          `https://${projectId}.supabase.co/functions/v1/make-server-f305f05f/get-user`,
+          {
+            headers: {
+              'Authorization': `Bearer ${session.access_token}`,
+            },
+          }
+        );
+
+        const result = await response.json();
+
+        if (result.success) {
+          setUser(result.user);
+          setAccessToken(session.access_token);
+        }
+      }
+    } catch (error) {
+      console.error('Error checking session:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleLogin = (loggedInUser: User, token: string) => {
+    setUser(loggedInUser);
+    setAccessToken(token);
+  };
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    setUser(null);
+    setAccessToken(null);
+    setCurrentPage('dashboard');
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto"></div>
+          <p className="mt-4">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <Login onLogin={handleLogin} />;
+  }
 
   const navigation = [
     { id: 'dashboard' as Page, label: 'Dashboard', icon: LayoutDashboard },
@@ -38,7 +106,7 @@ export default function App() {
       case 'dashboard':
         return <Dashboard />;
       case 'create-bill':
-        return <CreateBill />;
+        return <CreateBill user={user} />;
       case 'history':
         return <BillHistory />;
       case 'reports':
@@ -46,7 +114,7 @@ export default function App() {
       case 'stock':
         return <StockManagement />;
       case 'settings':
-        return <Settings />;
+        return <Settings user={user} accessToken={accessToken} />;
       default:
         return <Dashboard />;
     }
@@ -62,7 +130,10 @@ export default function App() {
       {/* Mobile Header */}
       <div className="lg:hidden bg-white border-b sticky top-0 z-40">
         <div className="flex items-center justify-between p-4">
-          <h1 className="text-xl">Sales & Billing</h1>
+          <div>
+            <h1 className="text-xl">Sales & Billing</h1>
+            <p className="text-xs text-muted-foreground">{user.name}</p>
+          </div>
           <Button
             variant="ghost"
             size="sm"
@@ -79,6 +150,10 @@ export default function App() {
           <div className="p-6">
             <h1 className="text-2xl">Sales & Billing</h1>
             <p className="text-sm text-muted-foreground mt-1">Management System</p>
+            <div className="mt-3 pt-3 border-t">
+              <p className="text-sm">{user.name}</p>
+              <p className="text-xs text-muted-foreground">{user.role}</p>
+            </div>
           </div>
           <nav className="px-3 space-y-1">
             {navigation.map((item) => {
@@ -97,6 +172,16 @@ export default function App() {
               );
             })}
           </nav>
+          <div className="p-3 mt-4">
+            <Button
+              variant="outline"
+              className="w-full justify-start"
+              onClick={handleLogout}
+            >
+              <LogOut className="mr-2 h-4 w-4" />
+              Logout
+            </Button>
+          </div>
         </aside>
 
         {/* Mobile Sidebar */}
@@ -106,6 +191,7 @@ export default function App() {
               <div className="p-6 flex items-center justify-between border-b">
                 <div>
                   <h2>Menu</h2>
+                  <p className="text-sm text-muted-foreground mt-1">{user.name}</p>
                 </div>
                 <Button
                   variant="ghost"
@@ -132,6 +218,16 @@ export default function App() {
                   );
                 })}
               </nav>
+              <div className="p-3">
+                <Button
+                  variant="outline"
+                  className="w-full justify-start"
+                  onClick={handleLogout}
+                >
+                  <LogOut className="mr-2 h-4 w-4" />
+                  Logout
+                </Button>
+              </div>
             </aside>
           </div>
         )}
