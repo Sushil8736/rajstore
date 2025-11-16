@@ -6,7 +6,7 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
-import { Plus, Pencil, Trash2, Package } from 'lucide-react';
+import { Plus, Pencil, Trash2, Package, AlertCircle, AlertTriangle, CheckCircle } from 'lucide-react';
 import { toast } from 'sonner';
 
 export function StockManagement() {
@@ -130,6 +130,43 @@ export function StockManagement() {
     }).format(amount);
   };
 
+  // Get stock level status and styling
+  const getStockStatus = (quantity: number) => {
+    if (quantity <= 10) {
+      return {
+        status: 'Low Stock',
+        borderColor: 'border-l-4 border-red-500',
+        bgColor: 'bg-red-50',
+        textColor: 'text-red-700',
+        icon: <AlertCircle className="h-4 w-4" />,
+      };
+    } else if (quantity <= 50) {
+      return {
+        status: 'Medium Stock',
+        borderColor: 'border-l-4 border-yellow-500',
+        bgColor: 'bg-yellow-50',
+        textColor: 'text-yellow-700',
+        icon: <AlertTriangle className="h-4 w-4" />,
+      };
+    } else {
+      return {
+        status: 'Good Stock',
+        borderColor: 'border-l-4 border-green-500',
+        bgColor: 'bg-green-50',
+        textColor: 'text-green-700',
+        icon: <CheckCircle className="h-4 w-4" />,
+      };
+    }
+  };
+
+  const getLowStockCount = () => {
+    return stockItems.filter(item => item.quantity <= 10).length;
+  };
+
+  const getMediumStockCount = () => {
+    return stockItems.filter(item => item.quantity > 10 && item.quantity <= 50).length;
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -145,7 +182,7 @@ export function StockManagement() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1>Stock Management</h1>
+          <h1 className="text-2xl font-bold">Stock Management</h1>
           <p className="text-muted-foreground">Manage your inventory</p>
         </div>
         <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
@@ -198,24 +235,25 @@ export function StockManagement() {
         </Dialog>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {/* Stock Level Summary */}
+      <div className="grid grid-cols-2 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm">Total Items</CardTitle>
+            <CardTitle className="text-sm font-medium">Total Items</CardTitle>
             <Package className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl">{stockItems.length}</div>
+            <div className="text-2xl font-bold">{stockItems.length}</div>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm">Total Quantity</CardTitle>
+            <CardTitle className="text-sm font-medium">Total Quantity</CardTitle>
             <Package className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl">
+            <div className="text-2xl font-bold">
               {stockItems.reduce((sum, item) => sum + item.quantity, 0)}
             </div>
           </CardContent>
@@ -223,14 +261,56 @@ export function StockManagement() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm">Total Value</CardTitle>
+            <CardTitle className="text-sm font-medium">Total Value</CardTitle>
             <Package className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl">{formatCurrency(getTotalValue())}</div>
+            <div className="text-2xl font-bold">{formatCurrency(getTotalValue())}</div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-red-200 bg-red-50">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Low Stock</CardTitle>
+            <AlertCircle className="h-4 w-4 text-red-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-red-700">{getLowStockCount()}</div>
+            <p className="text-xs text-red-600 mt-1">≤ 10 items</p>
+          </CardContent>
+        </Card>
+
+        <Card className="border-yellow-200 bg-yellow-50">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Medium Stock</CardTitle>
+            <AlertTriangle className="h-4 w-4 text-yellow-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-yellow-700">{getMediumStockCount()}</div>
+            <p className="text-xs text-yellow-600 mt-1">11-50 items</p>
           </CardContent>
         </Card>
       </div>
+
+      {/* Stock Level Legend */}
+      <Card className="bg-gray-50">
+        <CardContent className="pt-6">
+          <div className="flex items-center justify-center gap-6 text-sm">
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-red-500"></div>
+              <span className="text-red-700 font-medium">Low (≤10)</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+              <span className="text-yellow-700 font-medium">Medium (11-50)</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-green-500"></div>
+              <span className="text-green-700 font-medium">Good (50)</span>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
@@ -243,85 +323,106 @@ export function StockManagement() {
             </p>
           ) : (
             <div className="space-y-3">
-              {stockItems.map(item => (
-                <div
-                  key={item.id}
-                  className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50"
-                >
-                  <div className="flex-1">
-                    <p>{item.name}</p>
-                    <div className="flex gap-4 mt-1 text-sm text-muted-foreground">
-                      <span>Qty: {item.quantity}</span>
-                      {item.purchaseRate && (
-                        <>
-                          <span>Rate: {formatCurrency(item.purchaseRate)}</span>
-                          <span>Value: {formatCurrency(item.quantity * item.purchaseRate)}</span>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex gap-2">
-                    <Dialog open={editingItem?.id === item.id} onOpenChange={(open) => {
-                      if (!open) {
-                        setEditingItem(null);
-                        resetForm();
-                      }
-                    }}>
-                      <DialogTrigger asChild>
-                        <Button onClick={() => startEdit(item)} variant="outline" size="sm">
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent>
-                        <DialogHeader>
-                          <DialogTitle>Edit Stock Item</DialogTitle>
-                        </DialogHeader>
-                        <div className="space-y-4">
-                          <div className="space-y-2">
-                            <Label htmlFor="edit-name">Product Name *</Label>
-                            <Input
-                              id="edit-name"
-                              value={formData.name}
-                              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="edit-quantity">Quantity *</Label>
-                            <Input
-                              id="edit-quantity"
-                              type="number"
-                              min="0"
-                              value={formData.quantity}
-                              onChange={(e) => setFormData({ ...formData, quantity: Number(e.target.value) })}
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="edit-purchaseRate">Purchase Rate (₹) (Optional)</Label>
-                            <Input
-                              id="edit-purchaseRate"
-                              type="number"
-                              min="0"
-                              step="0.01"
-                              value={formData.purchaseRate}
-                              onChange={(e) => setFormData({ ...formData, purchaseRate: Number(e.target.value) })}
-                            />
-                          </div>
-                          <Button onClick={handleUpdate} className="w-full">
-                            Update Stock Item
-                          </Button>
-                        </div>
-                      </DialogContent>
-                    </Dialog>
-                    <Button
-                      onClick={() => handleDelete(item.id)}
-                      variant="outline"
-                      size="sm"
+              {stockItems
+                .sort((a, b) => a.quantity - b.quantity) // Sort by quantity (lowest first)
+                .map(item => {
+                  const status = getStockStatus(item.quantity);
+                  return (
+                    <div
+                      key={item.id}
+                      className={`flex items-center justify-between p-4 border rounded-lg hover:shadow-md transition-all ${status.borderColor} ${status.bgColor}`}
                     >
-                      <Trash2 className="h-4 w-4 text-red-500" />
-                    </Button>
-                  </div>
-                </div>
-              ))}
+                      <div className="flex-1 flex items-start gap-3">
+                        <div className={status.textColor}>
+                          {status.icon}
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <p className="font-semibold">{item.name}</p>
+                            <span className={`text-xs px-2 py-1 rounded-full ${status.textColor} bg-white border border-current`}>
+                              {status.status}
+                            </span>
+                          </div>
+                          <div className="flex gap-4 mt-2 text-sm">
+                            <span className={`font-semibold ${status.textColor}`}>
+                              Qty: {item.quantity}
+                            </span>
+                            {item.purchaseRate && (
+                              <>
+                                <span className="text-muted-foreground">
+                                  Rate: {formatCurrency(item.purchaseRate)}
+                                </span>
+                                <span className="text-muted-foreground">
+                                  Value: {formatCurrency(item.quantity * item.purchaseRate)}
+                                </span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <Dialog open={editingItem?.id === item.id} onOpenChange={(open) => {
+                          if (!open) {
+                            setEditingItem(null);
+                            resetForm();
+                          }
+                        }}>
+                          <DialogTrigger asChild>
+                            <Button onClick={() => startEdit(item)} variant="outline" size="sm">
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent>
+                            <DialogHeader>
+                              <DialogTitle>Edit Stock Item</DialogTitle>
+                            </DialogHeader>
+                            <div className="space-y-4">
+                              <div className="space-y-2">
+                                <Label htmlFor="edit-name">Product Name *</Label>
+                                <Input
+                                  id="edit-name"
+                                  value={formData.name}
+                                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label htmlFor="edit-quantity">Quantity *</Label>
+                                <Input
+                                  id="edit-quantity"
+                                  type="number"
+                                  min="0"
+                                  value={formData.quantity}
+                                  onChange={(e) => setFormData({ ...formData, quantity: Number(e.target.value) })}
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label htmlFor="edit-purchaseRate">Purchase Rate (₹) (Optional)</Label>
+                                <Input
+                                  id="edit-purchaseRate"
+                                  type="number"
+                                  min="0"
+                                  step="0.01"
+                                  value={formData.purchaseRate}
+                                  onChange={(e) => setFormData({ ...formData, purchaseRate: Number(e.target.value) })}
+                                />
+                              </div>
+                              <Button onClick={handleUpdate} className="w-full">
+                                Update Stock Item
+                              </Button>
+                            </div>
+                          </DialogContent>
+                        </Dialog>
+                        <Button
+                          onClick={() => handleDelete(item.id)}
+                          variant="outline"
+                          size="sm"
+                        >
+                          <Trash2 className="h-4 w-4 text-red-500" />
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })}
             </div>
           )}
         </CardContent>

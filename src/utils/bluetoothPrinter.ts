@@ -224,6 +224,10 @@ class BluetoothPrinterService {
       rate: number;
       total: number;
     }>;
+    subtotal?: number;
+    discountType?: 'fixed' | 'percentage';
+    discountValue?: number;
+    discountAmount?: number;
     grandTotal: number;
     notes?: string;
   }): Promise<void> {
@@ -301,14 +305,29 @@ class BluetoothPrinterService {
 
       // Print items
       for (const item of billData.items) {
-        // Format: Item (max 12 chars), Qty (3), Rate (7), Amount (8)
         const name = item.name.length > 12 ? item.name.substring(0, 12) + '…' : item.name.padEnd(12);
         const qty = item.quantity.toString().padStart(3);
         const rate = item.rate.toFixed(2).padStart(7);
         const total = item.total.toFixed(2).padStart(8);
-        // Single line for each item
         const itemLine = `${name}${qty}${rate}${total}`;
         commands.push(this.textToBytes(itemLine));
+        commands.push(this.lineFeed());
+      }
+
+      // Separator before totals
+      commands.push(this.separator('-'));
+
+      // Subtotal
+      const subtotal = billData.subtotal || billData.grandTotal;
+      commands.push(this.textToBytes(this.formatLine('Subtotal:', `Rs.${subtotal.toFixed(2)}`)));
+      commands.push(this.lineFeed());
+
+      // Discount (if applicable)
+      if (billData.discountValue && billData.discountValue > 0 && billData.discountAmount) {
+        const discountLabel = billData.discountType === 'percentage' 
+          ? `Discount (${billData.discountValue}%):`
+          : `Discount (Rs.${billData.discountValue}):`;
+        commands.push(this.textToBytes(this.formatLine(discountLabel, `- Rs.${billData.discountAmount.toFixed(2)}`)));
         commands.push(this.lineFeed());
       }
 
@@ -319,7 +338,7 @@ class BluetoothPrinterService {
       commands.push(this.setBold(true));
       commands.push(this.setTextSize(2, 2));
       commands.push(this.setAlignment(2)); // Right align
-      commands.push(this.textToBytes(`Grand Total: Rs.${billData.grandTotal.toFixed(2)}`));
+      commands.push(this.textToBytes(`Total: Rs.${billData.grandTotal.toFixed(2)}`));
       commands.push(this.lineFeed());
       commands.push(this.setTextSize(1, 1));
       commands.push(this.setBold(false));

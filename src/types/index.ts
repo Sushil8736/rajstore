@@ -1,3 +1,5 @@
+// Type definitions for the billing system
+
 export interface BillItem {
   id: string;
   name: string;
@@ -12,6 +14,10 @@ export interface Bill {
   date: string;
   customerName?: string;
   items: BillItem[];
+  subtotal?: number;
+  discountType?: 'fixed' | 'percentage';
+  discountValue?: number;
+  discountAmount?: number;
   grandTotal: number;
   paymentMode?: 'Cash' | 'UPI' | 'Card' | '';
   notes?: string;
@@ -41,6 +47,8 @@ export interface SalesReport {
   totalBills: number;
   paymentModes: Record<string, number>;
   bills: Bill[];
+  totalDiscount?: number;
+  averageDiscount?: number;
 }
 
 export interface User {

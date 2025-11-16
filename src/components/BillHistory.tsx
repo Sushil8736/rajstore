@@ -107,7 +107,7 @@ export function BillHistory() {
   return (
     <div className="space-y-6">
       <div>
-        <h1>Bill History</h1>
+        <h1 className="text-2xl font-bold">Bill History</h1>
         <p className="text-muted-foreground">View and search all bills</p>
       </div>
 
@@ -140,9 +140,9 @@ export function BillHistory() {
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <p>{bill.billNumber}</p>
+                        <p className="font-semibold">{bill.billNumber}</p>
                         {bill.paymentMode && (
-                          <span className="inline-flex items-center px-2 py-1 rounded text-xs bg-gray-100">
+                          <span className="inline-flex items-center px-2 py-1 rounded text-xs bg-blue-100 text-blue-800">
                             {bill.paymentMode}
                           </span>
                         )}
@@ -158,14 +158,35 @@ export function BillHistory() {
                       <p className="text-xs text-muted-foreground mt-1">
                         {formatDate(bill.date)}
                       </p>
-                      <div className="mt-2 text-sm">
+                      <div className="mt-2 text-sm space-y-1">
                         <p className="text-muted-foreground">
                           {bill.items.length} item{bill.items.length !== 1 ? 's' : ''}
                         </p>
+                        {bill.discountValue && bill.discountValue > 0 && (
+                          <div className="flex items-center gap-2 text-xs">
+                            <span className="px-2 py-0.5 bg-green-100 text-green-800 rounded">
+                              Discount: {bill.discountType === 'percentage' 
+                                ? `${bill.discountValue}%` 
+                                : formatCurrency(bill.discountValue)}
+                            </span>
+                            <span className="text-muted-foreground">
+                              Saved: {formatCurrency(bill.discountAmount || 0)}
+                            </span>
+                          </div>
+                        )}
                       </div>
                     </div>
                     <div className="text-right flex-shrink-0">
-                      <p className="text-xl">{formatCurrency(bill.grandTotal)}</p>
+                      <div className="space-y-1">
+                        {bill.subtotal && bill.subtotal !== bill.grandTotal && (
+                          <p className="text-sm text-muted-foreground line-through">
+                            {formatCurrency(bill.subtotal)}
+                          </p>
+                        )}
+                        <p className="text-xl font-bold text-green-600">
+                          {formatCurrency(bill.grandTotal)}
+                        </p>
+                      </div>
                       <div className="flex gap-2 mt-2">
                         <Button
                           onClick={() => setSelectedBill(bill)}
@@ -196,7 +217,7 @@ export function BillHistory() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="sticky top-0 bg-white border-b p-4 flex items-center justify-between">
-              <h2>Bill Details</h2>
+              <h2 className="text-xl font-bold">Bill Details</h2>
               <Button onClick={() => setSelectedBill(null)} variant="ghost" size="sm">
                 Close
               </Button>

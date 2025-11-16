@@ -6,20 +6,20 @@ import { Button } from './ui/button';
 import { Label } from './ui/label';
 import { Input } from './ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
-import { BarChart3, TrendingUp, FileText, IndianRupee } from 'lucide-react';
-import { toast } from 'sonner@2.0.3';
+import { BarChart3, TrendingUp, FileText, IndianRupee, Percent } from 'lucide-react';
+import { toast } from 'sonner';
 
 export function Reports() {
   const [report, setReport] = useState<SalesReport | null>(null);
   const [loading, setLoading] = useState(false);
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
-  const [selectedSeller, setSelectedSeller] = useState<string>('all');
 
   const generateReport = async (startDate: string, endDate: string) => {
     setLoading(true);
     try {
-      const reportData = await billAPI.getReport(startDate, endDate, selectedSeller);
+      // Don't send sellerId at all if we want all sellers
+      const reportData = await billAPI.getReport(startDate, endDate);
       setReport(reportData);
     } catch (error) {
       console.error('Error generating report:', error);
@@ -87,13 +87,15 @@ export function Reports() {
       day: '2-digit',
       month: 'short',
       year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
     });
   };
 
   return (
     <div className="space-y-6">
       <div>
-        <h1>Sales Reports</h1>
+        <h1 className="text-2xl font-bold">Sales Reports</h1>
         <p className="text-muted-foreground">Generate and view sales reports</p>
       </div>
 
@@ -165,36 +167,60 @@ export function Reports() {
 
       {report && !loading && (
         <div className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm">Total Sales</CardTitle>
+                <CardTitle className="text-sm font-medium">Total Sales</CardTitle>
                 <IndianRupee className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl">{formatCurrency(report.totalSales)}</div>
+                <div className="text-2xl font-bold">{formatCurrency(report.totalSales)}</div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  From {report.totalBills} bills
+                </p>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm">Total Bills</CardTitle>
+                <CardTitle className="text-sm font-medium">Total Bills</CardTitle>
                 <FileText className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl">{report.totalBills}</div>
+                <div className="text-2xl font-bold">{report.totalBills}</div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Transactions
+                </p>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm">Average Bill Value</CardTitle>
+                <CardTitle className="text-sm font-medium">Avg Bill Value</CardTitle>
                 <BarChart3 className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl">
+                <div className="text-2xl font-bold">
                   {formatCurrency(report.totalBills > 0 ? report.totalSales / report.totalBills : 0)}
                 </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Per transaction
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Total Discount</CardTitle>
+                <Percent className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-green-600">
+                  {formatCurrency(report.totalDiscount || 0)}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Avg: {formatCurrency(report.averageDiscount || 0)}
+                </p>
               </CardContent>
             </Card>
           </div>
@@ -208,12 +234,22 @@ export function Reports() {
                 <p className="text-center text-muted-foreground py-4">No payment mode data available</p>
               ) : (
                 <div className="space-y-3">
-                  {Object.entries(report.paymentModes).map(([mode, amount]) => (
-                    <div key={mode} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                      <span>{mode}</span>
-                      <span>{formatCurrency(amount)}</span>
-                    </div>
-                  ))}
+                  {Object.entries(report.paymentModes)
+                    .sort(([, a], [, b]) => b - a)
+                    .map(([mode, amount]) => (
+                      <div key={mode} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                        <div className="flex items-center gap-3">
+                          <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+                          <span className="font-medium">{mode}</span>
+                        </div>
+                        <div className="text-right">
+                          <div className="font-semibold">{formatCurrency(amount)}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {((amount / report.totalSales) * 100).toFixed(1)}% of total
+                          </div>
+                        </div>
+                      </div>
+                    ))}
                 </div>
               )}
             </CardContent>
@@ -231,21 +267,43 @@ export function Reports() {
                   {report.bills.map(bill => (
                     <div
                       key={bill.billNumber}
-                      className="flex items-center justify-between p-4 border rounded-lg"
+                      className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors"
                     >
-                      <div>
-                        <p>{bill.billNumber}</p>
+                      <div className="flex-1">
+                        <p className="font-semibold">{bill.billNumber}</p>
                         <p className="text-sm text-muted-foreground">
                           {bill.customerName || 'Walk-in Customer'}
                         </p>
-                        <p className="text-xs text-muted-foreground">
-                          {formatDate(bill.date)}
-                        </p>
+                        <div className="flex items-center gap-3 mt-1">
+                          <p className="text-xs text-muted-foreground">
+                            {formatDate(bill.date)}
+                          </p>
+                          {bill.sellerName && (
+                            <p className="text-xs text-muted-foreground">
+                              • Seller: {bill.sellerName}
+                            </p>
+                          )}
+                        </div>
+                        {bill.discountAmount && bill.discountAmount > 0 && (
+                          <div className="mt-2 inline-flex items-center gap-2 px-2 py-1 bg-green-50 text-green-700 rounded text-xs">
+                            <Percent className="h-3 w-3" />
+                            Discount: {formatCurrency(bill.discountAmount)}
+                          </div>
+                        )}
                       </div>
                       <div className="text-right">
-                        <p>{formatCurrency(bill.grandTotal)}</p>
+                        {bill.subtotal && bill.subtotal !== bill.grandTotal && (
+                          <p className="text-sm text-muted-foreground line-through">
+                            {formatCurrency(bill.subtotal)}
+                          </p>
+                        )}
+                        <p className="text-lg font-bold text-green-600">
+                          {formatCurrency(bill.grandTotal)}
+                        </p>
                         {bill.paymentMode && (
-                          <p className="text-sm text-muted-foreground">{bill.paymentMode}</p>
+                          <p className="text-sm text-muted-foreground mt-1">
+                            {bill.paymentMode}
+                          </p>
                         )}
                       </div>
                     </div>

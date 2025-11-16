@@ -58,6 +58,10 @@ export function BillPreview({ bill, settings }: BillPreviewProps) {
         sellerName: bill.sellerName,
         paymentMode: bill.paymentMode,
         items: bill.items,
+        subtotal: bill.subtotal || bill.grandTotal,
+        discountType: bill.discountType,
+        discountValue: bill.discountValue,
+        discountAmount: bill.discountAmount,
         grandTotal: bill.grandTotal,
         notes: bill.notes,
       };
@@ -65,7 +69,6 @@ export function BillPreview({ bill, settings }: BillPreviewProps) {
       await bluetoothPrinter.printBill(printData);
       setPrintSuccess(true);
       
-      // Clear success message after 3 seconds
       setTimeout(() => {
         setPrintSuccess(false);
       }, 3000);
@@ -136,7 +139,7 @@ export function BillPreview({ bill, settings }: BillPreviewProps) {
       <div className="bill-preview bg-white p-6 max-w-md mx-auto border-2 border-dashed border-gray-300">
         {/* Business Header */}
         <div className="text-center border-b-2 border-black pb-3 mb-3">
-          <h1 className="text-xl uppercase tracking-wide">
+          <h1 className="text-xl font-bold uppercase tracking-wide">
             {settings?.businessName || 'Your Business Name'}
           </h1>
           {settings?.address && (
@@ -154,28 +157,28 @@ export function BillPreview({ bill, settings }: BillPreviewProps) {
         {/* Bill Info */}
         <div className="space-y-1 text-xs mb-3 border-b border-dashed border-gray-400 pb-3">
           <div className="flex justify-between">
-            <span>Bill No:</span>
+            <span className="font-semibold">Bill No:</span>
             <span>{bill.billNumber}</span>
           </div>
           <div className="flex justify-between">
-            <span>Date:</span>
+            <span className="font-semibold">Date:</span>
             <span>{formatDate(bill.date)}</span>
           </div>
           {bill.customerName && (
             <div className="flex justify-between">
-              <span>Customer:</span>
+              <span className="font-semibold">Customer:</span>
               <span>{bill.customerName}</span>
             </div>
           )}
           {bill.sellerName && (
             <div className="flex justify-between">
-              <span>Seller:</span>
+              <span className="font-semibold">Seller:</span>
               <span>{bill.sellerName}</span>
             </div>
           )}
           {bill.paymentMode && (
             <div className="flex justify-between">
-              <span>Payment:</span>
+              <span className="font-semibold">Payment:</span>
               <span>{bill.paymentMode}</span>
             </div>
           )}
@@ -184,7 +187,7 @@ export function BillPreview({ bill, settings }: BillPreviewProps) {
         {/* Items Table */}
         <div className="mb-3">
           <div className="border-b-2 border-black pb-1 mb-2">
-            <div className="grid grid-cols-12 gap-1 text-xs uppercase">
+            <div className="grid grid-cols-12 gap-1 text-xs font-bold uppercase">
               <div className="col-span-5">Item</div>
               <div className="col-span-2 text-right">Qty</div>
               <div className="col-span-2 text-right">Rate</div>
@@ -198,17 +201,33 @@ export function BillPreview({ bill, settings }: BillPreviewProps) {
                 <div className="col-span-5 break-words">{item.name}</div>
                 <div className="col-span-2 text-right">{item.quantity}</div>
                 <div className="col-span-2 text-right">{item.rate.toFixed(2)}</div>
-                <div className="col-span-3 text-right">{item.total.toFixed(2)}</div>
+                <div className="col-span-3 text-right font-semibold">{item.total.toFixed(2)}</div>
               </div>
             ))}
           </div>
         </div>
 
-        {/* Total */}
-        <div className="border-t-2 border-black pt-2 mb-3">
-          <div className="flex justify-between items-center">
-            <span className="uppercase">Grand Total:</span>
-            <span className="text-xl">{formatCurrency(bill.grandTotal)}</span>
+        {/* Totals */}
+        <div className="border-t-2 border-black pt-2 mb-3 space-y-1">
+          <div className="flex justify-between items-center text-sm">
+            <span className="font-semibold">Subtotal:</span>
+            <span className="font-semibold">{formatCurrency(bill.subtotal || bill.grandTotal)}</span>
+          </div>
+          
+          {bill.discountValue && bill.discountValue > 0 && (
+            <div className="flex justify-between items-center text-xs text-green-700 bg-green-50 px-2 py-1 rounded">
+              <span>
+                Discount ({bill.discountType === 'percentage' 
+                  ? `${bill.discountValue}%` 
+                  : formatCurrency(bill.discountValue)}):
+              </span>
+              <span className="font-semibold">- {formatCurrency(bill.discountAmount || 0)}</span>
+            </div>
+          )}
+          
+          <div className="flex justify-between items-center border-t border-dashed border-gray-400 pt-1">
+            <span className="uppercase font-bold">Grand Total:</span>
+            <span className="text-xl font-bold">{formatCurrency(bill.grandTotal)}</span>
           </div>
         </div>
 
@@ -216,14 +235,14 @@ export function BillPreview({ bill, settings }: BillPreviewProps) {
         {bill.notes && (
           <div className="border-t border-dashed border-gray-400 pt-2 mb-3">
             <p className="text-xs">
-              <span className="uppercase">Note:</span> {bill.notes}
+              <span className="font-semibold uppercase">Note:</span> {bill.notes}
             </p>
           </div>
         )}
 
         {/* Footer */}
         <div className="text-center border-t-2 border-black pt-3 mt-3">
-          <p className="text-xs">Thank you for your business!</p>
+          <p className="text-xs font-semibold">Thank you for your business!</p>
         </div>
 
         <style>{`
