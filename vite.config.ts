@@ -11,7 +11,7 @@ export default defineConfig({
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-icon.svg'],
       manifest: {
         name: 'GORAK STORES',
-        short_name: 'ReactApp',
+        short_name: 'GORAK STORES',
         description: 'My Progressive Web App built with React',
         theme_color: '#ffffff',
         background_color: '#ffffff',
