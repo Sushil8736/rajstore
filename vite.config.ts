@@ -10,7 +10,7 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-icon.svg'],
       manifest: {
-        name: 'My React App',
+        name: 'GORAK STORES',
         short_name: 'ReactApp',
         description: 'My Progressive Web App built with React',
         theme_color: '#ffffff',
