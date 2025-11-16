@@ -417,18 +417,22 @@ export function CreateBill({ user }: CreateBillProps) {
                       <Input
                         type="number"
                         min="1"
-                        value={item.quantity}
-                        onChange={(e) => updateItem(item.id, 'quantity', Number(e.target.value))}
+                        value={item.quantity === null ? "" : item.quantity}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          updateItem(item.id, "quantity", val === "" ? null : Number(val));
+                        }}
                       />
                     </div>
                     <div className="space-y-2">
                       <Label>Rate (₹) *</Label>
                       <Input
                         type="number"
-                        min="0"
-                        step="0.01"
-                        value={item.rate}
-                        onChange={(e) => updateItem(item.id, 'rate', Number(e.target.value))}
+                        value={item.rate === null ? "" : item.rate}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          updateItem(item.id, "rate", val === "" ? null : Number(val));
+                        }}
                       />
                     </div>
                     <div className="space-y-2">
@@ -474,10 +478,13 @@ export function CreateBill({ user }: CreateBillProps) {
                 id="discountValue"
                 type="number"
                 min="0"
-                step={discountType === 'percentage' ? '0.01' : '1'}
-                max={discountType === 'percentage' ? '100' : undefined}
-                value={discountValue}
-                onChange={(e) => setDiscountValue(Number(e.target.value))}
+                step={discountType === "percentage" ? "0.01" : "1"}
+                max={discountType === "percentage" ? "100" : undefined}
+                value={discountValue === null ? "" : discountValue}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setDiscountValue(val === "" ? null : Number(val));
+                }}
                 placeholder="Enter discount"
               />
             </div>
