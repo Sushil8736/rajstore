@@ -23,6 +23,8 @@ import {
   LogOut,
 } from 'lucide-react';
 
+import { PWAInstallBanner, PWAUpdateBanner, OfflineIndicator } from './usePWA';
+
 type Page = 'dashboard' | 'create-bill' | 'history' | 'reports' | 'stock' | 'settings';
 
 export default function App() {
@@ -127,6 +129,9 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <OfflineIndicator />
+      <PWAInstallBanner />
+      <PWAUpdateBanner />
       {/* Mobile Header */}
       <div className="lg:hidden bg-white border-b sticky top-0 z-40">
         <div className="flex items-center justify-between p-4">
