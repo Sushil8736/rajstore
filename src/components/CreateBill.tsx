@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { billAPI, stockAPI, settingsAPI } from '../utils/api';
 import type { Bill, BillItem, StockItem, BusinessSettings, User } from '../types';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
@@ -39,15 +39,25 @@ function ItemModal({ isOpen, onClose, onSave, initialItem, stockItems }: ItemMod
   const [stockSearch, setStockSearch] = useState('');
   const [error, setError] = useState('');
 
+  const calculateTotal = useCallback((quantity: number, rate: number) => {
+    const q = Number(quantity) || 0;
+    const r = Number(rate) || 0;
+    return q * r;
+  }, []);
+
   useEffect(() => {
     // Reset item state when modal opens/changes context
     setItem(initialItem);
     setError('');
+    // Initialize stock search with the current item name if it exists
+    setStockSearch(initialItem.name || '');
   }, [initialItem, isOpen]);
 
-  // FIX: useMemo is now called unconditionally at the top level
   const filteredStock = useMemo(() => { 
-      return stockItems.filter(stock => stock.name.toLowerCase().includes(stockSearch.toLowerCase()));
+    if (stockSearch.length < 1) return []; // Only show suggestions if user starts typing
+    return stockItems.filter(stock => 
+      stock.name.toLowerCase().includes(stockSearch.toLowerCase())
+    ).slice(0, 5); // Limit suggestions to 5
   }, [stockItems, stockSearch]);
   // --- END: ALL HOOKS MUST BE UNCONDITIONAL ---
 
@@ -55,46 +65,83 @@ function ItemModal({ isOpen, onClose, onSave, initialItem, stockItems }: ItemMod
   // CONDITIONAL RETURN MUST COME AFTER ALL HOOKS
   if (!isOpen) return null; 
 
-  const handleUpdate = (field: keyof BillItem, value: any) => {
-    let updated = { ...item, [field]: value };
+
+  const handleUpdate = (field: keyof BillItem | 'search', value: any) => {
+    let updated = { ...item };
+    
+    if (field === 'search') {
+        setStockSearch(value);
+        
+        // If the user types, clear stockId if the current input doesn't match the selected item
+        const isLinkedStockName = stockItems.some(s => s.id === item.stockId && s.name === value);
+        if (item.stockId && !isLinkedStockName) {
+            updated.stockId = '';
+        }
+        updated.name = value;
+    } else {
+        updated = { ...item, [field]: value };
+    }
     
     // Ensure quantity and rate are numbers
     const quantity = Number(updated.quantity) || 0;
     const rate = Number(updated.rate) || 0;
 
-    if (field === 'quantity' || field === 'rate') {
-      updated.total = quantity * rate;
+    if (field === 'quantity' || field === 'rate' || field === 'search') {
+      updated.total = calculateTotal(quantity, rate);
     }
     
+    // Note: 'stockId' update logic from original code is now handled by handleSelectStock
     if (field === 'stockId' && value) {
       const stockItem = stockItems.find(s => s.id === value);
       if (stockItem) {
         updated.name = stockItem.name;
-        // Assuming purchaseRate is what you meant by 'rate' for BillItem
         updated.rate = stockItem.purchaseRate || 0;
-        updated.total = quantity * (updated.rate || 0);
+        updated.total = calculateTotal(quantity, updated.rate || 0);
       }
     }
     
     setItem(updated);
   };
+  
+  const handleSelectStock = (stock: StockItem) => {
+    const quantity = Number(item.quantity) || 1; // Keep current quantity if set
+    const rate = stock.purchaseRate || 0;
+    
+    const updated = {
+        ...item,
+        stockId: stock.id,
+        name: stock.name,
+        // Assuming purchaseRate is the rate to use for the bill
+        rate: rate, 
+        quantity: quantity,
+        total: calculateTotal(quantity, rate),
+    };
+
+    setItem(updated);
+    setStockSearch(stock.name); // Set input text to the selected item name
+  };
+
 
   const handleSave = () => {
-    if (!item.name.trim() || Number(item.quantity) <= 0 || Number(item.rate) <= 0) {
+    const name = item.name.trim();
+
+    if (!name || Number(item.quantity) <= 0 || Number(item.rate) <= 0) {
       setError('Please ensure Name, Quantity (>0), and Rate (>0) are correctly filled.');
       return;
     }
     
     const itemToSave = {
         ...item,
+        name: name,
         quantity: Number(item.quantity),
         rate: Number(item.rate),
-        total: Number(item.quantity) * Number(item.rate),
+        total: calculateTotal(Number(item.quantity), Number(item.rate)),
     };
     
     onSave(itemToSave);
     onClose();
     setItem(initialNewItem); // Reset for next use
+    setStockSearch('');
   };
 
 
@@ -102,7 +149,7 @@ function ItemModal({ isOpen, onClose, onSave, initialItem, stockItems }: ItemMod
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
       <div className="bg-white rounded-lg max-w-xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
         <div className="sticky top-0 bg-white border-b p-4 flex items-center justify-between">
-          <h2 className="text-xl font-bold">{item.stockId ? 'Edit Bill Item' : 'Add New Bill Item'}</h2>
+          <h2 className="text-xl font-bold">{initialItem.id ? 'Edit Bill Item' : 'Add New Bill Item'}</h2>
           <Button onClick={onClose} variant="ghost" size="sm">
             <X className="h-4 w-4" />
           </Button>
@@ -118,42 +165,41 @@ function ItemModal({ isOpen, onClose, onSave, initialItem, stockItems }: ItemMod
                 </Alert>
             )}
 
-            <div className="space-y-2">
-              <Label>Select from Stock (Optional)</Label>
-              <Select
-                value={item.stockId || ''}
-                onValueChange={(value) => handleUpdate('stockId', value)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select stock item" />
-                </SelectTrigger>
-                <SelectContent>
-                  <div className="px-2 py-1 sticky top-0 bg-white z-10">
+            {/* MERGED INPUT: Select from Stock or New Product */}
+            <div className="space-y-2 relative">
+                <Label>Product Name / Select from Stock *</Label>
+                <div className="relative">
                     <Input
-                      type="text"
-                      placeholder="Search stock..."
-                      value={stockSearch}
-                      onChange={e => setStockSearch(e.target.value)}
-                      className="mb-2"
+                        value={stockSearch}
+                        onChange={(e) => handleUpdate('search', e.target.value)}
+                        placeholder="Start typing product name or enter a new one"
+                        // Add rounded corners only to the top if suggestions are shown
+                        className={filteredStock.length > 0 ? 'rounded-b-none' : ''}
                     />
-                  </div>
-                  {filteredStock.map(stock => (
-                    <SelectItem key={stock.id} value={stock.id}>
-                      {stock.name} (Qty: {stock.quantity})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                    {/* Suggestion List */}
+                    {filteredStock.length > 0 && stockSearch.length > 0 && (
+                        <ul className="absolute z-20 w-full bg-white border border-t-0 rounded-b-lg shadow-lg max-h-48 overflow-y-auto">
+                            {filteredStock.map(stock => (
+                                <li 
+                                    key={stock.id} 
+                                    className="p-3 hover:bg-gray-100 cursor-pointer flex justify-between items-center text-sm"
+                                    onClick={() => handleSelectStock(stock)}
+                                >
+                                    <span>{stock.name}</span>
+                                    <span className="text-xs text-muted-foreground">Qty: {stock.quantity}</span>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+                </div>
+                {item.stockId && (
+                    <p className="text-xs text-green-600 flex items-center pt-1">
+                        <Lightbulb className="h-3 w-3 mr-1 flex-shrink-0" />
+                        Details linked to Stock Item: **{item.name}**
+                    </p>
+                )}
             </div>
-            
-            <div className="space-y-2">
-              <Label>Product Name *</Label>
-              <Input
-                value={item.name}
-                onChange={(e) => handleUpdate('name', e.target.value)}
-                placeholder="Enter product name"
-              />
-            </div>
+            {/* END MERGED INPUT */}
             
             <div className="grid grid-cols-3 gap-4">
                 <div className="space-y-2">
@@ -297,7 +343,7 @@ export function CreateBill({ user }: CreateBillProps) {
   const openAddItemModal = () => {
     setEditingItem({
         id: `item-${Date.now()}`, // Generate temp ID for new item
-        name: '', quantity: 1, rate: 0, total: 0,
+        name: '', quantity: 1, rate: 0, total: 0
     });
     setIsItemModalOpen(true);
   };
