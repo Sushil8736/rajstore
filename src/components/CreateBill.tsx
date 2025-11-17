@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { billAPI, stockAPI, settingsAPI } from '../utils/api';
 import type { Bill, BillItem, StockItem, BusinessSettings, User } from '../types';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
@@ -7,7 +7,7 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Textarea } from './ui/textarea';
-import { Plus, Trash2, Save, Printer, X, AlertCircle, Lightbulb } from 'lucide-react';
+import { Plus, Trash2, Save, Printer, X, AlertCircle, Lightbulb, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
 import { BillPreview } from './BillPreview';
 import { Alert, AlertDescription } from './ui/alert';
@@ -15,6 +15,192 @@ import { Alert, AlertDescription } from './ui/alert';
 interface CreateBillProps {
   user: User | null;
 }
+
+// Helper component for the Item CRUD Modal
+interface ItemModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSave: (item: BillItem) => void;
+  initialItem: BillItem;
+  stockItems: StockItem[];
+}
+
+const initialNewItem: BillItem = {
+  id: '', // Will be generated in saveItem if adding
+  name: '',
+  quantity: 1,
+  rate: 0,
+  total: 0,
+};
+
+function ItemModal({ isOpen, onClose, onSave, initialItem, stockItems }: ItemModalProps) {
+  // --- START: ALL HOOKS MUST BE UNCONDITIONAL ---
+  const [item, setItem] = useState<BillItem>(initialItem);
+  const [stockSearch, setStockSearch] = useState('');
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    // Reset item state when modal opens/changes context
+    setItem(initialItem);
+    setError('');
+  }, [initialItem, isOpen]);
+
+  // FIX: useMemo is now called unconditionally at the top level
+  const filteredStock = useMemo(() => { 
+      return stockItems.filter(stock => stock.name.toLowerCase().includes(stockSearch.toLowerCase()));
+  }, [stockItems, stockSearch]);
+  // --- END: ALL HOOKS MUST BE UNCONDITIONAL ---
+
+
+  // CONDITIONAL RETURN MUST COME AFTER ALL HOOKS
+  if (!isOpen) return null; 
+
+  const handleUpdate = (field: keyof BillItem, value: any) => {
+    let updated = { ...item, [field]: value };
+    
+    // Ensure quantity and rate are numbers
+    const quantity = Number(updated.quantity) || 0;
+    const rate = Number(updated.rate) || 0;
+
+    if (field === 'quantity' || field === 'rate') {
+      updated.total = quantity * rate;
+    }
+    
+    if (field === 'stockId' && value) {
+      const stockItem = stockItems.find(s => s.id === value);
+      if (stockItem) {
+        updated.name = stockItem.name;
+        // Assuming purchaseRate is what you meant by 'rate' for BillItem
+        updated.rate = stockItem.purchaseRate || 0;
+        updated.total = quantity * (updated.rate || 0);
+      }
+    }
+    
+    setItem(updated);
+  };
+
+  const handleSave = () => {
+    if (!item.name.trim() || Number(item.quantity) <= 0 || Number(item.rate) <= 0) {
+      setError('Please ensure Name, Quantity (>0), and Rate (>0) are correctly filled.');
+      return;
+    }
+    
+    const itemToSave = {
+        ...item,
+        quantity: Number(item.quantity),
+        rate: Number(item.rate),
+        total: Number(item.quantity) * Number(item.rate),
+    };
+    
+    onSave(itemToSave);
+    onClose();
+    setItem(initialNewItem); // Reset for next use
+  };
+
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+      <div className="bg-white rounded-lg max-w-xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+        <div className="sticky top-0 bg-white border-b p-4 flex items-center justify-between">
+          <h2 className="text-xl font-bold">{item.stockId ? 'Edit Bill Item' : 'Add New Bill Item'}</h2>
+          <Button onClick={onClose} variant="ghost" size="sm">
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+        
+        <div className="p-4 space-y-4">
+            {error && (
+                <Alert className="border-red-200 bg-red-50 py-2">
+                    <AlertCircle className="h-4 w-4 text-red-600" />
+                    <AlertDescription className="text-red-800 text-sm">
+                        {error}
+                    </AlertDescription>
+                </Alert>
+            )}
+
+            <div className="space-y-2">
+              <Label>Select from Stock (Optional)</Label>
+              <Select
+                value={item.stockId || ''}
+                onValueChange={(value) => handleUpdate('stockId', value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select stock item" />
+                </SelectTrigger>
+                <SelectContent>
+                  <div className="px-2 py-1 sticky top-0 bg-white z-10">
+                    <Input
+                      type="text"
+                      placeholder="Search stock..."
+                      value={stockSearch}
+                      onChange={e => setStockSearch(e.target.value)}
+                      className="mb-2"
+                    />
+                  </div>
+                  {filteredStock.map(stock => (
+                    <SelectItem key={stock.id} value={stock.id}>
+                      {stock.name} (Qty: {stock.quantity})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="space-y-2">
+              <Label>Product Name *</Label>
+              <Input
+                value={item.name}
+                onChange={(e) => handleUpdate('name', e.target.value)}
+                placeholder="Enter product name"
+              />
+            </div>
+            
+            <div className="grid grid-cols-3 gap-4">
+                <div className="space-y-2">
+                    <Label>Quantity *</Label>
+                    <Input
+                        type="number"
+                        min="1"
+                        value={item.quantity === null ? "" : item.quantity}
+                        onChange={(e) => {
+                            const val = e.target.value;
+                            handleUpdate("quantity", val === "" ? null : Number(val));
+                        }}
+                    />
+                </div>
+                <div className="space-y-2">
+                    <Label>Rate (₹) *</Label>
+                    <Input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={item.rate === null ? "" : item.rate}
+                        onChange={(e) => {
+                            const val = e.target.value;
+                            handleUpdate("rate", val === "" ? null : Number(val));
+                        }}
+                    />
+                </div>
+                <div className="space-y-2">
+                    <Label>Total (₹)</Label>
+                    <Input
+                        type="number"
+                        value={Number(item.total).toFixed(2)}
+                        readOnly
+                        className="bg-gray-50"
+                    />
+                </div>
+            </div>
+
+            <Button onClick={handleSave} className="w-full">
+                {initialItem.id ? 'Save Changes' : 'Add Item to Bill'}
+            </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 
 export function CreateBill({ user }: CreateBillProps) {
   const [billNumber, setBillNumber] = useState('');
@@ -29,11 +215,16 @@ export function CreateBill({ user }: CreateBillProps) {
   const [showPreview, setShowPreview] = useState(false);
   const [createdBill, setCreatedBill] = useState<Bill | null>(null);
   const [loading, setLoading] = useState(false);
-  const [stockSearch, setStockSearch] = useState('');
   
   // Discount states
   const [discountType, setDiscountType] = useState<'fixed' | 'percentage'>('fixed');
   const [discountValue, setDiscountValue] = useState<number>(0);
+
+  // Item Modal States
+  const [isItemModalOpen, setIsItemModalOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState<BillItem>({ // Item being edited or new template
+      id: '', name: '', quantity: 1, rate: 0, total: 0
+  });
 
   useEffect(() => {
     loadStock();
@@ -43,12 +234,10 @@ export function CreateBill({ user }: CreateBillProps) {
 
   const loadSuggestedBillNumber = async () => {
     try {
-      // Use the API endpoint to get suggested bill number
       const suggested = await billAPI.getNextBillNumber();
       setSuggestedBillNumber(suggested);
     } catch (error) {
       console.error('Error loading suggested bill number:', error);
-      // Fallback if API fails
       const year = new Date().getFullYear();
       const month = String(new Date().getMonth() + 1).padStart(2, '0');
       setSuggestedBillNumber(`${year}-${month}-001`);
@@ -75,12 +264,9 @@ export function CreateBill({ user }: CreateBillProps) {
 
   const checkBillNumberUnique = async (number: string): Promise<boolean> => {
     try {
-      // Use the API endpoint to check if bill exists
       const bill = await billAPI.getBillByNumber(number);
-      // If bill exists, it's not unique
       return bill === null;
     } catch (error) {
-      // If error (404 or other), assume it's unique
       console.log('Bill number check:', error);
       return true;
     }
@@ -92,7 +278,6 @@ export function CreateBill({ user }: CreateBillProps) {
   };
 
   const useSuggestedNumber = async () => {
-    // Fetch fresh suggestion from API
     try {
       const freshSuggestion = await billAPI.getNextBillNumber();
       setSuggestedBillNumber(freshSuggestion);
@@ -100,50 +285,52 @@ export function CreateBill({ user }: CreateBillProps) {
       setBillNumberError('');
     } catch (error) {
       console.error('Error fetching fresh suggestion:', error);
-      // Fallback to current suggestion
       setBillNumber(suggestedBillNumber);
       setBillNumberError('');
     }
   };
 
-  const addItem = () => {
-    const newItem: BillItem = {
-      id: `item-${Date.now()}`,
-      name: '',
-      quantity: 1,
-      rate: 0,
-      total: 0,
-    };
-    setItems([...items, newItem]);
+  // ------------------------------------------------------------------
+  // Item CRUD with Modal
+  // ------------------------------------------------------------------
+
+  const openAddItemModal = () => {
+    setEditingItem({
+        id: `item-${Date.now()}`, // Generate temp ID for new item
+        name: '', quantity: 1, rate: 0, total: 0,
+    });
+    setIsItemModalOpen(true);
   };
 
-  const updateItem = (id: string, field: keyof BillItem, value: any) => {
-    setItems(items.map(item => {
-      if (item.id === id) {
-        const updated = { ...item, [field]: value };
-        
-        if (field === 'quantity' || field === 'rate') {
-          updated.total = updated.quantity * updated.rate;
-        }
-        
-        if (field === 'stockId' && value) {
-          const stockItem = stockItems.find(s => s.id === value);
-          if (stockItem) {
-            updated.name = stockItem.name;
-            updated.rate = stockItem.purchaseRate || 0;
-            updated.total = updated.quantity * updated.rate;
-          }
-        }
-        
-        return updated;
-      }
-      return item;
-    }));
+  const editItem = (item: BillItem) => {
+    setEditingItem(item);
+    setIsItemModalOpen(true);
+  };
+
+  const saveItem = (itemToSave: BillItem) => {
+    const exists = items.some(i => i.id === itemToSave.id);
+
+    if (exists) {
+        // Update existing item
+        setItems(items.map(i => i.id === itemToSave.id ? itemToSave : i));
+        toast.success(`Item "${itemToSave.name}" updated!`);
+    } else {
+        // Add new item
+        // Use the ID generated in openAddItemModal or a fresh one if logic was skipped
+        const newItem = { ...itemToSave, id: itemToSave.id || `item-${Date.now()}` }; 
+        setItems([...items, newItem]);
+        toast.success(`Item "${itemToSave.name}" added!`);
+    }
   };
 
   const removeItem = (id: string) => {
     setItems(items.filter(item => item.id !== id));
+    toast.info('Item removed.');
   };
+
+  // ------------------------------------------------------------------
+  // Calculation functions (remain the same)
+  // ------------------------------------------------------------------
 
   const calculateSubtotal = () => {
     return items.reduce((sum, item) => sum + item.total, 0);
@@ -151,10 +338,11 @@ export function CreateBill({ user }: CreateBillProps) {
 
   const calculateDiscountAmount = () => {
     const subtotal = calculateSubtotal();
+    const discountVal = discountValue || 0;
     if (discountType === 'fixed') {
-      return Math.min(discountValue, subtotal);
+      return Math.min(discountVal, subtotal);
     } else {
-      return (subtotal * discountValue) / 100;
+      return (subtotal * discountVal) / 100;
     }
   };
 
@@ -163,6 +351,10 @@ export function CreateBill({ user }: CreateBillProps) {
     const discount = calculateDiscountAmount();
     return Math.max(0, subtotal - discount);
   };
+
+  // ------------------------------------------------------------------
+  // Main Save Handler (remains largely the same)
+  // ------------------------------------------------------------------
 
   const handleSaveBill = async () => {
     // Validation
@@ -178,13 +370,12 @@ export function CreateBill({ user }: CreateBillProps) {
     }
 
     if (items.some(item => !item.name || item.quantity <= 0 || item.rate <= 0)) {
-      toast.error('Please fill all item details');
-      return;
+        toast.error('One or more items have missing or invalid details.');
+        return;
     }
 
     setLoading(true);
     try {
-      // Check bill number uniqueness using API
       const isUnique = await checkBillNumberUnique(billNumber.trim());
       if (!isUnique) {
         setBillNumberError('This bill number already exists');
@@ -200,7 +391,7 @@ export function CreateBill({ user }: CreateBillProps) {
           if (!exists) {
             await stockAPI.addStock({
               name: item.name,
-              quantity: item.quantity,
+              quantity: item.quantity, 
               purchaseRate: item.rate,
             });
           }
@@ -241,7 +432,7 @@ export function CreateBill({ user }: CreateBillProps) {
       setDiscountValue(0);
       setBillNumber('');
       setBillNumberError('');
-      loadSuggestedBillNumber(); // Reload suggestion after creating bill
+      loadSuggestedBillNumber();
       loadStock();
     } catch (error) {
       console.error('Error creating bill:', error);
@@ -272,6 +463,7 @@ export function CreateBill({ user }: CreateBillProps) {
         )}
       </div>
 
+      {/* Bill Details Card (no change) */}
       <Card>
         <CardHeader>
           <CardTitle>Bill Details</CardTitle>
@@ -343,115 +535,60 @@ export function CreateBill({ user }: CreateBillProps) {
         </CardContent>
       </Card>
 
+      {/* Items Card - List only, 'Add Item' moved to the bottom */}
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle>Items</CardTitle>
-            <Button onClick={addItem} size="sm">
-              <Plus className="mr-2 h-4 w-4" />
-              Add Item
-            </Button>
-          </div>
+          <CardTitle>Items</CardTitle>
         </CardHeader>
         <CardContent>
           {items.length === 0 ? (
             <p className="text-center text-muted-foreground py-8">
-              No items added. Click "Add Item" to start.
+              No items added. Click "Add Item" below to start.
             </p>
           ) : (
             <div className="space-y-4">
-              {items.map((item, index) => (
-                <div key={item.id} className="border rounded-lg p-4 space-y-4">
-                  <div className="flex items-center justify-between">
-                    <p className="font-medium">Item {index + 1}</p>
-                    <Button
-                      onClick={() => removeItem(item.id)}
-                      variant="ghost"
-                      size="sm"
-                    >
-                      <Trash2 className="h-4 w-4 text-red-500" />
-                    </Button>
-                  </div>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Select from Stock (Optional)</Label>
-                      <Select
-                        value={item.stockId || ''}
-                        onValueChange={(value) => updateItem(item.id, 'stockId', value)}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select stock item" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <div className="px-2 py-1 sticky top-0 bg-white z-10">
-                            <Input
-                              type="text"
-                              placeholder="Search stock..."
-                              value={stockSearch}
-                              onChange={e => setStockSearch(e.target.value)}
-                              className="mb-2"
-                            />
-                          </div>
-                          {stockItems.filter(stock => stock.name.toLowerCase().includes(stockSearch.toLowerCase())).map(stock => (
-                            <SelectItem key={stock.id} value={stock.id}>
-                              {stock.name} (Qty: {stock.quantity})
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                {items.map((item, index) => (
+                    <div key={item.id} className="border rounded-lg p-4 flex items-center justify-between">
+                        <div>
+                            <p className="font-medium">
+                                {index + 1}. **{item.name}**
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                                {item.quantity} x ₹{item.rate.toFixed(2)} = **₹{item.total.toFixed(2)}**
+                            </p>
+                        </div>
+                        <div className="flex gap-2">
+                            <Button
+                                onClick={() => editItem(item)}
+                                variant="outline"
+                                size="icon"
+                                title="Edit Item"
+                            >
+                                <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                                onClick={() => removeItem(item.id)}
+                                variant="ghost"
+                                size="icon"
+                                title="Remove Item"
+                            >
+                                <Trash2 className="h-4 w-4 text-red-500" />
+                            </Button>
+                        </div>
                     </div>
-                    <div className="space-y-2">
-                      <Label>Product Name *</Label>
-                      <Input
-                        value={item.name}
-                        onChange={(e) => updateItem(item.id, 'name', e.target.value)}
-                        placeholder="Enter product name"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="space-y-2">
-                      <Label>Quantity *</Label>
-                      <Input
-                        type="number"
-                        min="1"
-                        value={item.quantity === null ? "" : item.quantity}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          updateItem(item.id, "quantity", val === "" ? null : Number(val));
-                        }}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Rate (₹) *</Label>
-                      <Input
-                        type="number"
-                        value={item.rate === null ? "" : item.rate}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          updateItem(item.id, "rate", val === "" ? null : Number(val));
-                        }}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Total (₹)</Label>
-                      <Input
-                        type="number"
-                        value={item.total.toFixed(2)}
-                        readOnly
-                        className="bg-gray-50"
-                      />
-                    </div>
-                  </div>
-                </div>
-              ))}
+                ))}
             </div>
           )}
         </CardContent>
       </Card>
+      
+      {/* New 'Add Item' location */}
+      <Button onClick={openAddItemModal} className="w-full" variant="outline">
+        <Plus className="mr-2 h-4 w-4" />
+        Add Item
+      </Button>
 
+      {/* Discount Card (no change) */}
       <Card>
         <CardHeader>
           <CardTitle>Discount</CardTitle>
@@ -492,6 +629,7 @@ export function CreateBill({ user }: CreateBillProps) {
         </CardContent>
       </Card>
 
+      {/* Summary and Save Card (no change) */}
       <Card>
         <CardContent className="pt-6">
           <div className="space-y-4">
@@ -541,6 +679,16 @@ export function CreateBill({ user }: CreateBillProps) {
         </CardContent>
       </Card>
 
+      {/* Item Modal */}
+      <ItemModal
+        isOpen={isItemModalOpen}
+        onClose={() => setIsItemModalOpen(false)}
+        onSave={saveItem}
+        initialItem={editingItem}
+        stockItems={stockItems}
+      />
+      
+      {/* Bill Preview Modal (no change) */}
       {showPreview && createdBill && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
