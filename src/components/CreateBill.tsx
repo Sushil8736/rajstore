@@ -149,7 +149,7 @@ function ItemModal({ isOpen, onClose, onSave, initialItem, stockItems }: ItemMod
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
       <div className="bg-white rounded-lg max-w-xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
         <div className="sticky top-0 bg-white border-b p-4 flex items-center justify-between">
-          <h2 className="text-xl font-bold">{initialItem.id ? 'Edit Bill Item' : 'Add New Bill Item'}</h2>
+          <h2 className="text-xl font-bold">{initialItem.name ? 'Edit Bill Item' : 'Add New Bill Item'}</h2>
           <Button onClick={onClose} variant="ghost" size="sm">
             <X className="h-4 w-4" />
           </Button>
