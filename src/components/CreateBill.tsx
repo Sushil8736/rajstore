@@ -14,6 +14,8 @@ import { Alert, AlertDescription } from './ui/alert';
 
 interface CreateBillProps {
   user: User | null;
+  editingBill?: Bill | null;
+  onEditComplete?: () => void;
 }
 
 // Helper component for the Item CRUD Modal
@@ -31,6 +33,9 @@ const initialNewItem: BillItem = {
   quantity: 1,
   rate: 0,
   total: 0,
+  discountType: 'percentage',
+  discountValue: 0,
+  discountAmount: 0,
 };
 
 function ItemModal({ isOpen, onClose, onSave, initialItem, stockItems }: ItemModalProps) {
@@ -39,10 +44,41 @@ function ItemModal({ isOpen, onClose, onSave, initialItem, stockItems }: ItemMod
   const [stockSearch, setStockSearch] = useState('');
   const [error, setError] = useState('');
 
-  const calculateTotal = useCallback((quantity: number, rate: number) => {
+  const calculateTotal = useCallback((quantity: number, rate: number, discountType?: 'fixed' | 'percentage', discountValue?: number) => {
     const q = Number(quantity) || 0;
     const r = Number(rate) || 0;
-    return q * r;
+    const subtotal = q * r;
+
+    const dValue = Number(discountValue) || 0;
+    let discount = 0;
+
+    if (dValue > 0) {
+      if (discountType === 'fixed') {
+        discount = Math.min(dValue, subtotal);
+      } else {
+        discount = (subtotal * dValue) / 100;
+      }
+    }
+
+    return Math.max(0, subtotal - discount);
+  }, []);
+
+  const calculateDiscountAmount = useCallback((quantity: number, rate: number, discountType?: 'fixed' | 'percentage', discountValue?: number) => {
+    const q = Number(quantity) || 0;
+    const r = Number(rate) || 0;
+    const subtotal = q * r;
+
+    const dValue = Number(discountValue) || 0;
+
+    if (dValue > 0) {
+      if (discountType === 'fixed') {
+        return Math.min(dValue, subtotal);
+      } else {
+        return (subtotal * dValue) / 100;
+      }
+    }
+
+    return 0;
   }, []);
 
   useEffect(() => {
@@ -68,10 +104,10 @@ function ItemModal({ isOpen, onClose, onSave, initialItem, stockItems }: ItemMod
 
   const handleUpdate = (field: keyof BillItem | 'search', value: any) => {
     let updated = { ...item };
-    
+
     if (field === 'search') {
         setStockSearch(value);
-        
+
         // If the user types, clear stockId if the current input doesn't match the selected item
         const isLinkedStockName = stockItems.some(s => s.id === item.stockId && s.name === value);
         if (item.stockId && !isLinkedStockName) {
@@ -81,40 +117,47 @@ function ItemModal({ isOpen, onClose, onSave, initialItem, stockItems }: ItemMod
     } else {
         updated = { ...item, [field]: value };
     }
-    
+
     // Ensure quantity and rate are numbers
     const quantity = Number(updated.quantity) || 0;
     const rate = Number(updated.rate) || 0;
+    const discountType = updated.discountType || 'percentage';
+    const discountValue = Number(updated.discountValue) || 0;
 
-    if (field === 'quantity' || field === 'rate' || field === 'search') {
-      updated.total = calculateTotal(quantity, rate);
+    if (field === 'quantity' || field === 'rate' || field === 'search' || field === 'discountType' || field === 'discountValue') {
+      updated.total = calculateTotal(quantity, rate, discountType, discountValue);
+      updated.discountAmount = calculateDiscountAmount(quantity, rate, discountType, discountValue);
     }
-    
+
     // Note: 'stockId' update logic from original code is now handled by handleSelectStock
     if (field === 'stockId' && value) {
       const stockItem = stockItems.find(s => s.id === value);
       if (stockItem) {
         updated.name = stockItem.name;
         updated.rate = stockItem.purchaseRate || 0;
-        updated.total = calculateTotal(quantity, updated.rate || 0);
+        updated.total = calculateTotal(quantity, updated.rate || 0, discountType, discountValue);
+        updated.discountAmount = calculateDiscountAmount(quantity, updated.rate || 0, discountType, discountValue);
       }
     }
-    
+
     setItem(updated);
   };
   
   const handleSelectStock = (stock: StockItem) => {
     const quantity = Number(item.quantity) || 1; // Keep current quantity if set
     const rate = stock.purchaseRate || 0;
-    
+    const discountType = item.discountType || 'percentage';
+    const discountValue = Number(item.discountValue) || 0;
+
     const updated = {
         ...item,
         stockId: stock.id,
         name: stock.name,
         // Assuming purchaseRate is the rate to use for the bill
-        rate: rate, 
+        rate: rate,
         quantity: quantity,
-        total: calculateTotal(quantity, rate),
+        total: calculateTotal(quantity, rate, discountType, discountValue),
+        discountAmount: calculateDiscountAmount(quantity, rate, discountType, discountValue),
     };
 
     setItem(updated);
@@ -129,15 +172,23 @@ function ItemModal({ isOpen, onClose, onSave, initialItem, stockItems }: ItemMod
       setError('Please ensure Name, Quantity (>0), and Rate (>0) are correctly filled.');
       return;
     }
-    
+
+    const quantity = Number(item.quantity);
+    const rate = Number(item.rate);
+    const discountType = item.discountType || 'percentage';
+    const discountValue = Number(item.discountValue) || 0;
+
     const itemToSave = {
         ...item,
         name: name,
-        quantity: Number(item.quantity),
-        rate: Number(item.rate),
-        total: calculateTotal(Number(item.quantity), Number(item.rate)),
+        quantity: quantity,
+        rate: rate,
+        discountType: discountType,
+        discountValue: discountValue,
+        discountAmount: calculateDiscountAmount(quantity, rate, discountType, discountValue),
+        total: calculateTotal(quantity, rate, discountType, discountValue),
     };
-    
+
     onSave(itemToSave);
     onClose();
     setItem(initialNewItem); // Reset for next use
@@ -228,13 +279,71 @@ function ItemModal({ isOpen, onClose, onSave, initialItem, stockItems }: ItemMod
                     />
                 </div>
                 <div className="space-y-2">
-                    <Label>Total (₹)</Label>
+                    <Label>Subtotal (₹)</Label>
                     <Input
                         type="number"
-                        value={Number(item.total).toFixed(2)}
+                        value={(Number(item.quantity) * Number(item.rate)).toFixed(2)}
                         readOnly
                         className="bg-gray-50"
                     />
+                </div>
+            </div>
+
+            {/* Item Discount Section */}
+            <div className="border-t pt-4 space-y-4">
+                <Label className="text-sm font-semibold">Item Discount (Optional)</Label>
+                <div className="grid grid-cols-3 gap-4">
+                    <div className="space-y-2">
+                        <Label>Discount Type</Label>
+                        <Select
+                            value={item.discountType || 'percentage'}
+                            onValueChange={(value: 'fixed' | 'percentage') => handleUpdate('discountType', value)}
+                        >
+                            <SelectTrigger>
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="percentage">Percentage (%)</SelectItem>
+                                <SelectItem value="fixed">Fixed Amount (₹)</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <div className="space-y-2">
+                        <Label>
+                            Discount {item.discountType === 'percentage' ? '(%)' : '(₹)'}
+                        </Label>
+                        <Input
+                            type="number"
+                            min="0"
+                            step={item.discountType === 'percentage' ? "0.01" : "1"}
+                            max={item.discountType === 'percentage' ? "100" : undefined}
+                            value={item.discountValue === null || item.discountValue === undefined ? "" : item.discountValue}
+                            onChange={(e) => {
+                                const val = e.target.value;
+                                handleUpdate("discountValue", val === "" ? 0 : Number(val));
+                            }}
+                            placeholder="0"
+                        />
+                    </div>
+                    <div className="space-y-2">
+                        <Label>Discount Amount (₹)</Label>
+                        <Input
+                            type="number"
+                            value={(item.discountAmount || 0).toFixed(2)}
+                            readOnly
+                            className="bg-gray-50"
+                        />
+                    </div>
+                </div>
+            </div>
+
+            {/* Final Total */}
+            <div className="border-t pt-4">
+                <div className="flex justify-between items-center">
+                    <Label className="text-lg font-semibold">Final Total (₹)</Label>
+                    <span className="text-2xl font-bold text-green-600">
+                        ₹{Number(item.total).toFixed(2)}
+                    </span>
                 </div>
             </div>
 
@@ -248,7 +357,7 @@ function ItemModal({ isOpen, onClose, onSave, initialItem, stockItems }: ItemMod
 }
 
 
-export function CreateBill({ user }: CreateBillProps) {
+export function CreateBill({ user, editingBill, onEditComplete }: CreateBillProps) {
   const [billNumber, setBillNumber] = useState('');
   const [suggestedBillNumber, setSuggestedBillNumber] = useState('');
   const [billNumberError, setBillNumberError] = useState('');
@@ -261,7 +370,8 @@ export function CreateBill({ user }: CreateBillProps) {
   const [showPreview, setShowPreview] = useState(false);
   const [createdBill, setCreatedBill] = useState<Bill | null>(null);
   const [loading, setLoading] = useState(false);
-  
+  const [isEditMode, setIsEditMode] = useState(false);
+
   // Discount states
   const [discountType, setDiscountType] = useState<'fixed' | 'percentage'>('fixed');
   const [discountValue, setDiscountValue] = useState<number>(0);
@@ -275,8 +385,23 @@ export function CreateBill({ user }: CreateBillProps) {
   useEffect(() => {
     loadStock();
     loadSettings();
-    loadSuggestedBillNumber();
+    if (!editingBill) {
+      loadSuggestedBillNumber();
+    }
   }, []);
+
+  useEffect(() => {
+    if (editingBill) {
+      setIsEditMode(true);
+      setBillNumber(editingBill.billNumber);
+      setCustomerName(editingBill.customerName || '');
+      setPaymentMode(editingBill.paymentMode || '');
+      setNotes(editingBill.notes || '');
+      setItems(editingBill.items || []);
+      setDiscountType(editingBill.discountType || 'fixed');
+      setDiscountValue(editingBill.discountValue || 0);
+    }
+  }, [editingBill]);
 
   const loadSuggestedBillNumber = async () => {
     try {
@@ -343,7 +468,8 @@ export function CreateBill({ user }: CreateBillProps) {
   const openAddItemModal = () => {
     setEditingItem({
         id: `item-${Date.now()}`, // Generate temp ID for new item
-        name: '', quantity: 1, rate: 0, total: 0
+        name: '', quantity: 1, rate: 0, total: 0,
+        discountType: 'percentage', discountValue: 0, discountAmount: 0
     });
     setIsItemModalOpen(true);
   };
@@ -422,12 +548,15 @@ export function CreateBill({ user }: CreateBillProps) {
 
     setLoading(true);
     try {
-      const isUnique = await checkBillNumberUnique(billNumber.trim());
-      if (!isUnique) {
-        setBillNumberError('This bill number already exists');
-        toast.error('Bill number already exists. Please use a different number.');
-        setLoading(false);
-        return;
+      // Only check uniqueness if creating a new bill or if bill number was changed
+      if (!isEditMode || (editingBill && billNumber.trim() !== editingBill.billNumber)) {
+        const isUnique = await checkBillNumberUnique(billNumber.trim());
+        if (!isUnique) {
+          setBillNumberError('This bill number already exists');
+          toast.error('Bill number already exists. Please use a different number.');
+          setLoading(false);
+          return;
+        }
       }
 
       // Auto-create stock for manual entries
@@ -450,7 +579,7 @@ export function CreateBill({ user }: CreateBillProps) {
 
       const bill: Bill = {
         billNumber: billNumber.trim(),
-        date: new Date().toISOString(),
+        date: isEditMode && editingBill ? editingBill.date : new Date().toISOString(),
         customerName: customerName || undefined,
         items,
         subtotal,
@@ -465,21 +594,32 @@ export function CreateBill({ user }: CreateBillProps) {
         sellerName: user?.name,
       };
 
-      await billAPI.createBill(bill);
-      setCreatedBill(bill);
-      toast.success('Bill created successfully!');
-      
-      // Reset form
-      setCustomerName('');
-      setPaymentMode('');
-      setNotes('');
-      setItems([]);
-      setDiscountType('fixed');
-      setDiscountValue(0);
-      setBillNumber('');
-      setBillNumberError('');
-      loadSuggestedBillNumber();
-      loadStock();
+      if (isEditMode) {
+        await billAPI.updateBill(bill);
+        setCreatedBill(bill);
+        toast.success('Bill updated successfully!');
+        if (onEditComplete) {
+          onEditComplete();
+        }
+      } else {
+        await billAPI.createBill(bill);
+        setCreatedBill(bill);
+        toast.success('Bill created successfully!');
+      }
+
+      // Reset form only if not in edit mode
+      if (!isEditMode) {
+        setCustomerName('');
+        setPaymentMode('');
+        setNotes('');
+        setItems([]);
+        setDiscountType('fixed');
+        setDiscountValue(0);
+        setBillNumber('');
+        setBillNumberError('');
+        loadSuggestedBillNumber();
+        loadStock();
+      }
     } catch (error) {
       console.error('Error creating bill:', error);
       toast.error('Failed to create bill');
@@ -498,8 +638,8 @@ export function CreateBill({ user }: CreateBillProps) {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Create Bill</h1>
-          <p className="text-muted-foreground">Enter bill details and items</p>
+          <h1 className="text-2xl font-bold">{isEditMode ? 'Edit Bill' : 'Create Bill'}</h1>
+          <p className="text-muted-foreground">{isEditMode ? 'Update bill details and items' : 'Enter bill details and items'}</p>
         </div>
         {createdBill && (
           <Button onClick={handlePrint} variant="outline">
@@ -593,36 +733,51 @@ export function CreateBill({ user }: CreateBillProps) {
             </p>
           ) : (
             <div className="space-y-4">
-                {items.map((item, index) => (
-                    <div key={item.id} className="border rounded-lg p-4 flex items-center justify-between">
-                        <div>
-                            <p className="font-medium">
-                                {index + 1}. **{item.name}**
-                            </p>
-                            <p className="text-sm text-muted-foreground">
-                                {item.quantity} x ₹{item.rate.toFixed(2)} = **₹{item.total.toFixed(2)}**
-                            </p>
+                {items.map((item, index) => {
+                    const subtotal = item.quantity * item.rate;
+                    const hasDiscount = item.discountValue && item.discountValue > 0;
+                    return (
+                        <div key={item.id} className="border rounded-lg p-4 flex items-center justify-between">
+                            <div className="flex-1">
+                                <p className="font-medium">
+                                    {index + 1}. {item.name}
+                                </p>
+                                <p className="text-sm text-muted-foreground">
+                                    {item.quantity} x ₹{item.rate.toFixed(2)} = ₹{subtotal.toFixed(2)}
+                                </p>
+                                {hasDiscount && (
+                                    <p className="text-xs text-green-600 mt-1">
+                                        Discount: {item.discountType === 'percentage'
+                                            ? `${item.discountValue}%`
+                                            : `₹${item.discountValue}`}
+                                        {' '}(-₹{(item.discountAmount || 0).toFixed(2)})
+                                    </p>
+                                )}
+                                <p className="text-sm font-semibold text-green-600 mt-1">
+                                    Final: ₹{item.total.toFixed(2)}
+                                </p>
+                            </div>
+                            <div className="flex gap-2">
+                                <Button
+                                    onClick={() => editItem(item)}
+                                    variant="outline"
+                                    size="icon"
+                                    title="Edit Item"
+                                >
+                                    <Pencil className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                    onClick={() => removeItem(item.id)}
+                                    variant="ghost"
+                                    size="icon"
+                                    title="Remove Item"
+                                >
+                                    <Trash2 className="h-4 w-4 text-red-500" />
+                                </Button>
+                            </div>
                         </div>
-                        <div className="flex gap-2">
-                            <Button
-                                onClick={() => editItem(item)}
-                                variant="outline"
-                                size="icon"
-                                title="Edit Item"
-                            >
-                                <Pencil className="h-4 w-4" />
-                            </Button>
-                            <Button
-                                onClick={() => removeItem(item.id)}
-                                variant="ghost"
-                                size="icon"
-                                title="Remove Item"
-                            >
-                                <Trash2 className="h-4 w-4 text-red-500" />
-                            </Button>
-                        </div>
-                    </div>
-                ))}
+                    );
+                })}
             </div>
           )}
         </CardContent>
@@ -719,7 +874,7 @@ export function CreateBill({ user }: CreateBillProps) {
               disabled={loading || items.length === 0}
             >
               <Save className="mr-2 h-4 w-4" />
-              {loading ? 'Saving...' : 'Save Bill'}
+              {loading ? (isEditMode ? 'Updating...' : 'Saving...') : (isEditMode ? 'Update Bill' : 'Save Bill')}
             </Button>
           </div>
         </CardContent>

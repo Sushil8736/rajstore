@@ -236,14 +236,14 @@ app.get('/make-server-f305f05f/get-bill/:billNumber', async (c) => {
 app.post('/make-server-f305f05f/get-report', async (c) => {
   try {
     const { startDate, endDate, sellerId } = await c.req.json();
-    
+
     const bills = await kv.getByPrefix('bill:');
     const billObjects = bills.map(item => typeof item === 'string' ? JSON.parse(item) : item);
-    
+
     const start = new Date(startDate);
     const end = new Date(endDate);
     end.setHours(23, 59, 59, 999);
-    
+
     let filteredBills = billObjects.filter(bill => {
       const billDate = new Date(bill.date);
       return billDate >= start && billDate <= end;
@@ -253,17 +253,17 @@ app.post('/make-server-f305f05f/get-report', async (c) => {
     if (sellerId && sellerId !== 'all') {
       filteredBills = filteredBills.filter(bill => bill.sellerId === sellerId);
     }
-    
+
     const totalSales = filteredBills.reduce((sum, bill) => sum + bill.grandTotal, 0);
     const totalBills = filteredBills.length;
-    
+
     // Group by payment mode
     const paymentModes = filteredBills.reduce((acc, bill) => {
       const mode = bill.paymentMode || 'Not Specified';
       acc[mode] = (acc[mode] || 0) + bill.grandTotal;
       return acc;
     }, {} as Record<string, number>);
-    
+
     return c.json({
       success: true,
       report: {
@@ -275,6 +275,44 @@ app.post('/make-server-f305f05f/get-report', async (c) => {
     });
   } catch (error) {
     console.log('Error generating report:', error);
+    return c.json({ error: String(error), success: false }, 500);
+  }
+});
+
+// Update bill
+app.put('/make-server-f305f05f/update-bill', async (c) => {
+  try {
+    const bill = await c.req.json();
+
+    if (!bill.billNumber) {
+      return c.json({ error: 'Bill number is required', success: false }, 400);
+    }
+
+    // Check if bill exists
+    const existingBillData = await kv.get(`bill:${bill.billNumber}`);
+    if (!existingBillData) {
+      return c.json({ error: 'Bill not found', success: false }, 404);
+    }
+
+    // Store updated bill
+    await kv.set(`bill:${bill.billNumber}`, bill);
+
+    return c.json({ success: true, bill });
+  } catch (error) {
+    console.log('Error updating bill:', error);
+    return c.json({ error: String(error), success: false }, 500);
+  }
+});
+
+// Delete bill
+app.delete('/make-server-f305f05f/delete-bill/:billNumber', async (c) => {
+  try {
+    const billNumber = c.req.param('billNumber');
+    await kv.del(`bill:${billNumber}`);
+
+    return c.json({ success: true });
+  } catch (error) {
+    console.log('Error deleting bill:', error);
     return c.json({ error: String(error), success: false }, 500);
   }
 });

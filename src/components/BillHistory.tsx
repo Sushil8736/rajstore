@@ -4,11 +4,15 @@ import type { Bill, BusinessSettings } from '../types';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Input } from './ui/input';
 import { Button } from './ui/button';
-import { Search, Printer, Eye, Trash2 } from 'lucide-react';
+import { Search, Printer, Eye, Trash2, Pencil } from 'lucide-react';
 import { BillPreview } from './BillPreview';
 import { toast } from 'sonner';
 
-export function BillHistory() {
+interface BillHistoryProps {
+  onEditBill?: (bill: Bill) => void;
+}
+
+export function BillHistory({ onEditBill }: BillHistoryProps) {
   const [bills, setBills] = useState<Bill[]>([]);
   const [filteredBills, setFilteredBills] = useState<Bill[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -192,14 +196,27 @@ export function BillHistory() {
                           onClick={() => setSelectedBill(bill)}
                           variant="outline"
                           size="sm"
+                          title="View Bill"
                         >
                           <Eye className="h-4 w-4" />
                         </Button>
+
+                        {onEditBill && (
+                          <Button
+                            onClick={() => onEditBill(bill)}
+                            variant="outline"
+                            size="sm"
+                            title="Edit Bill"
+                          >
+                            <Pencil className="h-4 w-4 text-blue-600" />
+                          </Button>
+                        )}
 
                         <Button
                           onClick={() => handleDelete(bill.billNumber)}
                           variant="outline"
                           size="sm"
+                          title="Delete Bill"
                         >
                           <Trash2 className="h-4 w-4 text-red-500" />
                         </Button>

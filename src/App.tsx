@@ -8,7 +8,7 @@ import { Settings } from './components/Settings';
 import { Login } from './components/Login';
 import { Button } from './components/ui/button';
 import { Toaster } from './components/ui/sonner';
-import { User } from './types';
+import { User, Bill } from './types';
 import { supabase } from './utils/supabase/client';
 import { projectId, publicAnonKey } from './utils/supabase/info';
 import {
@@ -33,6 +33,7 @@ export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [editingBill, setEditingBill] = useState<Bill | null>(null);
 
   useEffect(() => {
     checkSession();
@@ -103,14 +104,24 @@ export default function App() {
     { id: 'settings' as Page, label: 'Settings', icon: SettingsIcon },
   ];
 
+  const handleEditBill = (bill: Bill) => {
+    setEditingBill(bill);
+    setCurrentPage('create-bill');
+  };
+
+  const handleEditComplete = () => {
+    setEditingBill(null);
+    setCurrentPage('history');
+  };
+
   const renderPage = () => {
     switch (currentPage) {
       case 'dashboard':
         return <Dashboard />;
       case 'create-bill':
-        return <CreateBill user={user} />;
+        return <CreateBill user={user} editingBill={editingBill} onEditComplete={handleEditComplete} />;
       case 'history':
-        return <BillHistory />;
+        return <BillHistory onEditBill={handleEditBill} />;
       case 'reports':
         return <Reports />;
       case 'stock':
@@ -123,6 +134,10 @@ export default function App() {
   };
 
   const handleNavigate = (page: Page) => {
+    // Clear editing bill when navigating away from create-bill
+    if (page !== 'create-bill') {
+      setEditingBill(null);
+    }
     setCurrentPage(page);
     setIsMobileMenuOpen(false);
   };

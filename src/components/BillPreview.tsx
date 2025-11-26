@@ -196,14 +196,35 @@ export function BillPreview({ bill, settings }: BillPreviewProps) {
           </div>
           
           <div className="space-y-2">
-            {bill.items.map((item, index) => (
-              <div key={index} className="grid grid-cols-12 gap-1 text-xs">
-                <div className="col-span-5 break-words">{item.name}</div>
-                <div className="col-span-2 text-right">{item.quantity}</div>
-                <div className="col-span-2 text-right">{item.rate.toFixed(2)}</div>
-                <div className="col-span-3 text-right font-semibold">{item.total.toFixed(2)}</div>
-              </div>
-            ))}
+            {bill.items.map((item, index) => {
+              const subtotal = item.quantity * item.rate;
+              const hasDiscount = item.discountValue && item.discountValue > 0;
+              return (
+                <div key={index} className="space-y-0.5">
+                  <div className="grid grid-cols-12 gap-1 text-xs">
+                    <div className="col-span-5 break-words">{item.name}</div>
+                    <div className="col-span-2 text-right">{item.quantity}</div>
+                    <div className="col-span-2 text-right">{item.rate.toFixed(2)}</div>
+                    <div className="col-span-3 text-right font-semibold">
+                      {hasDiscount ? subtotal.toFixed(2) : item.total.toFixed(2)}
+                    </div>
+                  </div>
+                  {hasDiscount && (
+                    <div className="grid grid-cols-12 gap-1 text-[10px] text-green-600">
+                      <div className="col-span-5"></div>
+                      <div className="col-span-4 text-right">
+                        Discount: {item.discountType === 'percentage'
+                          ? `${item.discountValue}%`
+                          : `₹${item.discountValue}`}
+                      </div>
+                      <div className="col-span-3 text-right font-semibold">
+                        {item.total.toFixed(2)}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
 

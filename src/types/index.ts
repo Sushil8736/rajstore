@@ -7,6 +7,9 @@ export interface BillItem {
   rate: number;
   total: number;
   stockId?: string;
+  discountType?: 'fixed' | 'percentage';
+  discountValue?: number;
+  discountAmount?: number;
 }
 
 export interface Bill {

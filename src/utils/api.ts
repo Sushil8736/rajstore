@@ -78,6 +78,15 @@ export const billAPI = {
     return data.report;
   },
 
+  // Update bill
+  updateBill: async (bill: Bill): Promise<Bill> => {
+    const data = await apiCall('/update-bill', {
+      method: 'PUT',
+      body: JSON.stringify(bill),
+    });
+    return data.bill;
+  },
+
   // Delete bill
   deleteBill: async (billNumber: string): Promise<void> => {
     await apiCall(`/delete-bill/${encodeURIComponent(billNumber)}`, {
