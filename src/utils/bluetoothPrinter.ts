@@ -223,6 +223,9 @@ class BluetoothPrinterService {
       quantity: number;
       rate: number;
       total: number;
+      discountType?: 'fixed' | 'percentage';
+      discountValue?: number;
+      discountAmount?: number;
     }>;
     subtotal?: number;
     discountType?: 'fixed' | 'percentage';
@@ -305,13 +308,33 @@ class BluetoothPrinterService {
 
       // Print items
       for (const item of billData.items) {
+        const subtotal = item.quantity * item.rate;
+        const hasDiscount = item.discountValue && item.discountValue > 0;
+
         const name = item.name.length > 12 ? item.name.substring(0, 12) + '…' : item.name.padEnd(12);
         const qty = item.quantity.toString().padStart(3);
         const rate = item.rate.toFixed(2).padStart(7);
-        const total = item.total.toFixed(2).padStart(8);
-        const itemLine = `${name}${qty}${rate}${total}`;
+        const amount = (hasDiscount ? subtotal : item.total).toFixed(2).padStart(8);
+        const itemLine = `${name}${qty}${rate}${amount}`;
         commands.push(this.textToBytes(itemLine));
         commands.push(this.lineFeed());
+
+        // Print item discount if applicable
+        if (hasDiscount) {
+          const discountLabel = item.discountType === 'percentage'
+            ? `Discount:${item.discountValue}%`
+            : `Discount:Rs${item.discountValue}`;
+          const discountInfo = `  ${discountLabel} -Rs${(item.discountAmount || 0).toFixed(2)}`;
+          commands.push(this.textToBytes(discountInfo));
+          commands.push(this.lineFeed());
+
+          // After discount amount
+          const afterDiscountLine = this.formatLine('  After Discount:', `Rs.${item.total.toFixed(2)}`);
+          commands.push(this.setBold(true));
+          commands.push(this.textToBytes(afterDiscountLine));
+          commands.push(this.lineFeed());
+          commands.push(this.setBold(false));
+        }
       }
 
       // Separator before totals
