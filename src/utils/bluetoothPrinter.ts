@@ -233,6 +233,7 @@ class BluetoothPrinterService {
     discountAmount?: number;
     grandTotal: number;
     notes?: string;
+    termsAndConditions?: string;
   }): Promise<void> {
     if (!this.isConnected()) {
       throw new Error('Printer not connected');
@@ -372,6 +373,20 @@ class BluetoothPrinterService {
         commands.push(this.separator('-'));
         commands.push(this.textToBytes(`Note: ${billData.notes}`));
         commands.push(this.lineFeed());
+      }
+
+      // Terms and Conditions
+      if (billData.termsAndConditions) {
+        commands.push(this.separator('-'));
+        commands.push(this.setAlignment(1)); // Center
+        // Split terms and conditions by newlines for better formatting
+        const termsLines = billData.termsAndConditions.split('\n');
+        for (const line of termsLines) {
+          if (line.trim()) {
+            commands.push(this.textToBytes(line.trim()));
+            commands.push(this.lineFeed());
+          }
+        }
       }
 
       // Footer

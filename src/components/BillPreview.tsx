@@ -64,6 +64,7 @@ export function BillPreview({ bill, settings }: BillPreviewProps) {
         discountAmount: bill.discountAmount,
         grandTotal: bill.grandTotal,
         notes: bill.notes,
+        termsAndConditions: settings?.termsAndConditions,
       };
 
       await bluetoothPrinter.printBill(printData);
@@ -264,6 +265,15 @@ export function BillPreview({ bill, settings }: BillPreviewProps) {
           <div className="border-t border-dashed border-gray-400 pt-2 mb-3">
             <p className="text-xs">
               <span className="font-semibold uppercase">Note:</span> {bill.notes}
+            </p>
+          </div>
+        )}
+
+        {/* Terms and Conditions */}
+        {settings?.termsAndConditions && (
+          <div className="text-center border-t border-dashed border-gray-400 pt-2 mb-3">
+            <p className="text-xs whitespace-pre-line">
+              {settings.termsAndConditions}
             </p>
           </div>
         )}

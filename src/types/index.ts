@@ -43,6 +43,7 @@ export interface BusinessSettings {
   phone?: string;
   email?: string;
   gst?: string;
+  termsAndConditions?: string;
 }
 
 export interface SalesReport {

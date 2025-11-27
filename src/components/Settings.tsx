@@ -136,6 +136,17 @@ export function Settings({ user, accessToken }: SettingsProps) {
                 />
               </div>
 
+              <div className="space-y-2">
+                <Label htmlFor="termsAndConditions">Terms and Conditions</Label>
+                <Textarea
+                  id="termsAndConditions"
+                  value={settings.termsAndConditions}
+                  onChange={(e) => setSettings({ ...settings, termsAndConditions: e.target.value })}
+                  placeholder="Example: Hilton, Haqkins, Bajaj any facing problem please contact care number. *Steel selected items are Guaranteed for one year after purchase. **Thank you so much visit again."
+                  rows={5}
+                />
+              </div>
+
               <Button onClick={handleSave} disabled={loading}>
                 <Save className="mr-2 h-4 w-4" />
                 {loading ? 'Saving...' : 'Save Settings'}
