@@ -320,9 +320,8 @@ function ItemModal({ isOpen, onClose, onSave, initialItem, stockItems }: ItemMod
                             value={item.discountValue === null || item.discountValue === undefined ? "" : item.discountValue}
                             onChange={(e) => {
                                 const val = e.target.value;
-                                handleUpdate("discountValue", val === "" ? 0 : Number(val));
+                                handleUpdate("discountValue", val === "" ? "" : Number(val));
                             }}
-                            placeholder="0"
                         />
                     </div>
                     <div className="space-y-2">
@@ -560,18 +559,18 @@ export function CreateBill({ user, editingBill, onEditComplete }: CreateBillProp
       }
 
       // Auto-create stock for manual entries
-      for (const item of items) {
-        if (!item.stockId && item.name) {
-          const exists = stockItems.some(stock => stock.name.toLowerCase() === item.name.toLowerCase());
-          if (!exists) {
-            await stockAPI.addStock({
-              name: item.name,
-              quantity: item.quantity, 
-              purchaseRate: item.rate,
-            });
-          }
-        }
-      }
+      // for (const item of items) {
+      //   if (!item.stockId && item.name) {
+      //     const exists = stockItems.some(stock => stock.name.toLowerCase() === item.name.toLowerCase());
+      //     if (!exists) {
+      //       await stockAPI.addStock({
+      //         name: item.name,
+      //         quantity: item.quantity, 
+      //         purchaseRate: item.rate,
+      //       });
+      //     }
+      //   }
+      // }
 
       const subtotal = calculateSubtotal();
       const discountAmount = calculateDiscountAmount();
